@@ -1,5 +1,5 @@
 [project]
-name = "ibl_python_template"
+name = "plane2brain"
 version = "0.1.0"
 description = "Default template for PDM package"
 authors = [
