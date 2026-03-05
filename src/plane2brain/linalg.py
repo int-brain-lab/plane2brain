@@ -80,6 +80,11 @@ def intersect_line_plane_nb(
     n: np.ndarray,
 ) -> np.ndarray:
     """see intersect_line_plane() docstring"""
+    l0 = np.ascontiguousarray(l0)
+    l = np.ascontiguousarray(l)
+    p0 = np.ascontiguousarray(p0)
+    n = np.ascontiguousarray(n)
+
     # can only be called if we are sure such intersection point exists
     d = np.dot(p0 - l0, n) / np.dot(l, n)
     return l0 + d * l
@@ -173,6 +178,9 @@ def intersect_line_mesh_np(
 @nb.njit("float64(float64[:],float64[:])")
 def get_angle(a, b):
     # the angle between two vectors a and b
+    # to adress the performance warnings: ensure contiguous arrays
+    a = np.ascontiguousarray(a)
+    b = np.ascontiguousarray(b)
     return np.arccos(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
 
 
@@ -222,7 +230,7 @@ def intersect_line_mesh_nb(
     )
 
 
-@nb.njit("Tuple((float64[:,:], int64))(float64[:,:,:],float64[:])")
+# @nb.njit("Tuple((float64[:], int64))(float64[:,:,:],float64[:])")
 def get_closest_face(
     faces: np.ndarray,
     point: np.ndarray,
@@ -236,11 +244,11 @@ def get_closest_face(
     Returns:
         Tuple[np.ndarray, np.ndarray]: the closest face and it's index
     """
-    # faces is
-    dists = np.array(
-        [linalg.norm(point - np.average(face, axis=0)) for face in faces],
-        dtype="float64",
-    )
+    # calculate distance to all and get minimum
+    dists = np.zeros(faces.shape, dtype="float64")
+    for i in range(faces.shape[0]):
+        dists[i, :] = linalg.norm(point - np.average(faces[i], axis=0))
+
     min_ix = np.argmin(dists)
     return faces[min_ix], min_ix
 
@@ -275,6 +283,8 @@ def find_closest_point_from_line_nb(
     Returns:
         np.ndarray: the closest point
     """
+    l0 = np.ascontiguousarray(l0)
+    l = np.ascontiguousarray(l)
     vs = (l0 - points) - np.dot(l0 - points, l)[:, np.newaxis] * l
     ds = np.array([linalg.norm(v) for v in vs])
     point = points[np.argmin(ds)]
