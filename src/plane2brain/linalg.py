@@ -245,9 +245,9 @@ def get_closest_face(
         Tuple[np.ndarray, np.ndarray]: the closest face and it's index
     """
     # calculate distance to all and get minimum
-    dists = np.zeros(faces.shape, dtype="float64")
+    dists = np.zeros(faces.shape[0], dtype="float64")
     for i in range(faces.shape[0]):
-        dists[i, :] = linalg.norm(point - np.average(faces[i], axis=0))
+        dists[i] = linalg.norm(point - np.average(faces[i], axis=0))
 
     min_ix = np.argmin(dists)
     return faces[min_ix], min_ix
