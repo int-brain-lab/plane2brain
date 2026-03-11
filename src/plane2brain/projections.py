@@ -17,10 +17,9 @@ from plane2brain.linalg import (
 
 from plane2brain.scanimage import create_coordinate_systems_from_scanimage_meta
 
-from plane2brain.brain_meshes import get_plane_at_point_mlap, calculate_surface_triangulation
-from iblatlas.atlas import MRITorontoAtlas, AllenAtlas
+from plane2brain.atlas import ProjectionAtlas
 
-from typing import Literal, Tuple, Dict
+from typing import Literal, Tuple, Dict, List
 
 """
  
@@ -38,22 +37,27 @@ from typing import Literal, Tuple, Dict
 def project_coords_onto_atlas_surface(
     coords_um: np.ndarray,  # in um
     coordinate_systems_3d: LinkedCoordinateSystems,
-    brain_mesh: dict,
+    atlas: ProjectionAtlas,
     projection_vector: np.ndarray,  # project along this axis. Positive is defined to point away from the brain surface
 ) -> np.ndarray:
     # coordinate_systems_3d needs to contain imaging plane and mlapv
-    # TODO add assertion here!
+    assert [
+        key in coordinate_systems_3d.coordinate_systems.keys()
+        for key in ["imaging_plane", "mlapdv"]
+    ]
 
     # in um in the imaging plane
     coords_um_ = np.concatenate([coords_um, np.zeros((coords_um.shape[0], 1))], axis=1)
-    coords_on_imaging_plane = coordinate_systems_3d.transform(coords_um_, "imaging_plane", "mlapdv")
+    coords_on_imaging_plane = coordinate_systems_3d.transform(
+        coords_um_, "imaging_plane", "mlapdv"
+    )
     # project the rois onto the brain surface along the brain normal
     coords_on_surface = np.zeros_like(coords_on_imaging_plane)
     for i, _coords in enumerate(tqdm(coords_on_imaging_plane)):
         try:
             faces, intersection_points, ix = intersect_line_mesh_nb(
-                brain_mesh["vertices"],
-                brain_mesh["edges"],
+                atlas.mesh["vertices"],
+                atlas.mesh["edges"],
                 _coords,
                 projection_vector * -1,
             )
@@ -68,13 +72,15 @@ def project_coords_onto_atlas_surface(
 
 def project_down_from_surface(
     coords_on_surface: np.ndarray,
-    brain_mesh: dict,  # TODO replace with atlas object
+    atlas: ProjectionAtlas,
     coords_depths: np.ndarray,
 ) -> np.ndarray:
     coords_mlapdv = np.zeros_like(coords_on_surface)
     for i, point in enumerate(tqdm(coords_on_surface)):
-        p, n = get_plane_at_point_mlap(point[0], point[1], brain_mesh, numba=True)
-        coords_mlapdv[i] = p + n * -1 * coords_depths[i]  # either depth of the imaging plane
+        p, n = atlas.get_plane_at_point_mlap(point[0], point[1], numba=True)
+        coords_mlapdv[i] = (
+            p + n * -1 * coords_depths[i]
+        )  # either depth of the imaging plane
 
     return coords_mlapdv
 
@@ -92,29 +98,19 @@ def project_from_scanimage_meta(
     coords_px: Dict[str, np.ndarray],  # keys = scanimage fov uuids
     scanimage_meta: dict,
     scanner_orientation: dict,
-    craniotomy_center_mlap: np.ndarray,  # or reference point mlap
-    # fov_uuids: Optional[List[str]] = None,
-    atlas: Literal["MRIToronto", "Allen"] = "MRIToronto",  # TODO the atlas configuration should not be part of this method
-    atlas_resolution: int = 50,
+    common_point_mlap: np.ndarray,
+    atlas: ProjectionAtlas,
     ds: int = 1,  # downsample factor for debugging
-) -> Tuple[Dict[str, Dict[str, np.ndarray]], Dict[str, LinkedCoordinateSystems], LinkedCoordinateSystems]:
-    match atlas:
-        case "MRIToronto":
-            atlas = MRITorontoAtlas(atlas_resolution)
-        case "Allen":
-            atlas = AllenAtlas(atlas_resolution)
-        case _:
-            raise NotImplementedError
-    atlas.compute_surface()
-    brain_mesh = calculate_surface_triangulation(atlas)
-    # brain_surface_points = get_surface_points(atlas)
-
+) -> Tuple[
+    Dict[str, Dict[str, np.ndarray]],
+    Dict[str, LinkedCoordinateSystems],
+    LinkedCoordinateSystems,
+]:
     # and creating the coordinate system
     # TODO integrate ref point 0,0 differnces
     # ref_point_mlap == craniotomy center
-    ref_point_mlapdv, brain_normal_at_ref = get_plane_at_point_mlap(
-        *craniotomy_center_mlap,
-        brain_mesh,
+    ref_point_mlapdv, brain_normal_at_ref = atlas.get_plane_at_point_mlap(
+        *common_point_mlap,
         numba=True,
     )
     coordinate_systems_3d = setup_coordinate_systems_3d(
@@ -151,7 +147,7 @@ def project_from_scanimage_meta(
         coords_projected[fov_uuid]["on_surface"] = project_coords_onto_atlas_surface(
             _coords_um,
             coordinate_systems_3d,
-            brain_mesh,
+            atlas,
             brain_normal_at_ref,
         )
 
@@ -172,7 +168,7 @@ def project_from_scanimage_meta(
 
 
 def get_brain_surface_normal(
-    reference_brain_surface_points: dict,
+    reference_brain_surface_points: Dict,
     ref_img_meta: dict,
     coordinate_systems_ref: LinkedCoordinateSystems,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -184,18 +180,28 @@ def get_brain_surface_normal(
     # and scanimage specific
 
     # DOCME user selected
-    stack_ixs = [point["stack_idx"] for point in reference_brain_surface_points["points"]]
+    stack_ixs = [
+        point["stack_idx"] for point in reference_brain_surface_points["points"]
+    ]
     # the position of the voice coil (for z offset calculation)
     # fastz_pos = ref_img_meta["scanImageParams"]['hFastZ']['position']
     # inversion of the sign: positive is up
-    stack_dv = -1 * np.array(ref_img_meta["scanImageParams"]["hStackManager"]["zs"])[stack_ixs]
-    dv_avg = np.average(stack_dv)  # horizontally average plane between the selected surface points
-    brain_surface_points_rel = np.array([point["coords"] for point in reference_brain_surface_points["points"]])
+    stack_dv = (
+        -1 * np.array(ref_img_meta["scanImageParams"]["hStackManager"]["zs"])[stack_ixs]
+    )
+    dv_avg = np.average(
+        stack_dv
+    )  # horizontally average plane between the selected surface points
+    brain_surface_points_rel = np.array(
+        [point["coords"] for point in reference_brain_surface_points["points"]]
+    )
     brain_surface_points_rel_um = coordinate_systems_ref.transform(
         brain_surface_points_rel, "image", "um"
     )  # NOTE this is um_global
     # these are the 3 points on the brain surface, relative, in um
-    brain_surface_points_rel_um_3d = np.concatenate([brain_surface_points_rel_um, stack_dv[:, np.newaxis]], axis=1)
+    brain_surface_points_rel_um_3d = np.concatenate(
+        [brain_surface_points_rel_um, stack_dv[:, np.newaxis]], axis=1
+    )
     p_surface, n_surface = plane_normal_form(brain_surface_points_rel_um_3d)
     # invert if pointing downards
     if n_surface[2] < 0:
@@ -235,13 +241,17 @@ def correct_coords_for_tilt_2d(
         coords_surface = np.zeros((coords_um.shape[0], 3))
 
         # turning this into 3d coordinates using the fov depth
-        coords_um_3d = np.concatenate([coords_um, np.ones((coords_um.shape[0], 1)) * fov_depths[uuid]], axis=1)
+        coords_um_3d = np.concatenate(
+            [coords_um, np.ones((coords_um.shape[0], 1)) * fov_depths[uuid]], axis=1
+        )
 
         for i, _coords in enumerate(coords_um_3d):
             # depth below plane
 
             # the ml, ap of these are the corrected values
-            coords_surface[i] = intersect_line_plane(_coords, n_surface, p_surface, n_surface)
+            coords_surface[i] = intersect_line_plane(
+                _coords, n_surface, p_surface, n_surface
+            )
 
         # true dv is the distance between the point and the plane
         dv_below_surface = np.sqrt(np.sum((coords_um_3d - coords_surface) ** 2, axis=1))
@@ -255,19 +265,19 @@ def correct_coords_for_tilt_2d(
 def reproject_coords(  # FIXME refactor
     coords: Dict[str, Dict[str, np.ndarray]],
     coordinate_systems_3d: LinkedCoordinateSystems,
-    brain_mesh: dict,
+    atlas: ProjectionAtlas,
     projection_vector: np.ndarray,
 ) -> Dict[str, Dict[str, np.ndarray]]:
     for uuid in list(coords.keys()):
         coords_on_surface = project_coords_onto_atlas_surface(
             coords[uuid]["um_corrected"],
             coordinate_systems_3d,
-            brain_mesh,
+            atlas,
             projection_vector,
         )
         coords_reprojected = project_down_from_surface(
             coords_on_surface,
-            brain_mesh,
+            atlas,
             coords_depths=coords[uuid]["dv_below_surface"],
         )
         coords[uuid]["reprojected"] = coords_reprojected

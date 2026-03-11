@@ -121,12 +121,11 @@ def get_reference_points_from_meta(
     ref_img_meta: dict,
     use_resolved: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    # we need a point in the imaged plane to be known in the atlas coordinate system
-    # here we assume:
-    # a) the center of the craniotomy is at 0,0 in scanimage reference frame
-    # b) the optical axis of the glass window and the brain normal are collinear
+    # in our case the known point is the center of the craniotomy
 
-    # the center of the craniotomy,
+    # the contents of ref_img_meta['centerMM'] are:
+    #   x/y pixel offset difference from nx/2, ny/2
+    #   ML/AP are ml ap coordinates
     ref_point_mlap = []
     for key in ["ML", "AP"]:
         if key + "_resolved" in ref_img_meta["centerMM"] and use_resolved:
@@ -134,18 +133,18 @@ def get_reference_points_from_meta(
         ref_point_mlap.append(ref_img_meta["centerMM"][key] * 1e3)
     ref_point_mlap = np.array(ref_point_mlap)
 
+    # ref is the coordinate system of scanimage (galvo angle)
+    # TODO although ... I think this is wrong
     ref_point_ref = []
-    for key in ["x", "y"]:  # this here is to be replaced with the actual mapping
+    for key in ["x", "y"]:
         ref_point_ref.append(ref_img_meta["centerDeg"][key])
     ref_point_ref = np.array(ref_point_ref)
-    # MAJOR TODO FIXME ref point ref is never used, however the origin of the
-    # coordinate system should be adjusted for it!!
-
     return ref_point_mlap, ref_point_ref
 
 
 def infer_imaging_collection(eid: str, one: ONE, location="server") -> str:
     # infer the imaging collection
+    # TODO add non server usage
     session_path = _eid2path(eid=eid, one=one, location=location)
     assert session_path.exists()
     raw_imaging_collections = [c for c in session_path.glob("*") if c.is_dir() and "raw_imaging_data" in str(c)]

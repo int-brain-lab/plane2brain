@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 import numpy as np
 from numpy import linalg
@@ -65,12 +65,17 @@ class CoordinateSystem:
 
 
 class LinkedCoordinateSystems:
-    def __init__(self, coordinate_systems: dict):
+    def __init__(
+        self,
+        coordinate_systems: Dict[str, CoordinateSystem],
+    ):
         self.coordinate_systems = coordinate_systems
         # all have the same dim
         assert len(set([cs.dim for cs in self.coordinate_systems.values()])) == 1
         # no duplicate names
-        assert len(set([name for name in self.coordinate_systems.keys()])) == len(self.coordinate_systems)
+        assert len(set([name for name in self.coordinate_systems.keys()])) == len(
+            self.coordinate_systems
+        )
         self.dim = next(iter(self.coordinate_systems.values())).dim
 
     def transform(
@@ -202,7 +207,12 @@ def setup_coordinate_systems_3d(
     cs3d = LinkedCoordinateSystems(
         dict(
             mlapdv=CoordinateSystem(basis=np.identity(3), origin=np.zeros(3)),
-            imaging_plane=cs3d_from_normal(center_mlapdv, brain_normal, rotate_by=rotate_by, invert_dims=invert_dims),
+            imaging_plane=cs3d_from_normal(
+                center_mlapdv,
+                brain_normal,
+                rotate_by=rotate_by,
+                invert_dims=invert_dims,
+            ),
         )
     )
 
@@ -222,7 +232,9 @@ def create_coordinate_system_for_ref(
         dict(
             um=CoordinateSystem(basis=np.identity(2), origin=np.zeros(2)),
             pixel=CoordinateSystem(basis=np.diag(um_per_px), origin=img_topleft_um),
-            image=CoordinateSystem(basis=np.diag(img_size_px * um_per_px), origin=img_topleft_um),
+            image=CoordinateSystem(
+                basis=np.diag(img_size_px * um_per_px), origin=img_topleft_um
+            ),
         )
     )
     # some verifications
@@ -272,7 +284,9 @@ def create_coordinate_system_for_image(
         dict(
             ref=CoordinateSystem(basis=np.identity(2), origin=np.zeros(2)),
             pixel=CoordinateSystem(basis=np.diag(ref_per_px), origin=img_topleft_ref),
-            um_image=CoordinateSystem(basis=np.diag(ref_per_um), origin=img_topleft_ref),
+            um_image=CoordinateSystem(
+                basis=np.diag(ref_per_um), origin=img_topleft_ref
+            ),
             um_global=CoordinateSystem(basis=np.diag(ref_per_um), origin=np.zeros(2)),
             # TODO docme here why the origin of um is also 0,0
             # because in our use case both ref and um share the same origin
@@ -317,4 +331,7 @@ def get_image_corners(img_size_px, coordinate_systems, to="um"):
     )
     # this is correct by visual inspection
 
-    return {name: coordinate_systems.transform(np.array(corner), "pixel", to) for name, corner in corners.items()}
+    return {
+        name: coordinate_systems.transform(np.array(corner), "pixel", to)
+        for name, corner in corners.items()
+    }
