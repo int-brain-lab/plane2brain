@@ -1,3 +1,4 @@
+from typing import List
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.pyplot as mpl
@@ -24,7 +25,9 @@ def plot_triangle(triangle_points, axes=None, **kwargs):
         kwargs["color"] = "k"
 
     a, b, c = triangle_points
-    points = np.concatenate([triangle_points, triangle_points[0, :][np.newaxis, :]], axis=0)
+    points = np.concatenate(
+        [triangle_points, triangle_points[0, :][np.newaxis, :]], axis=0
+    )
     axes.plot(*points.T, **kwargs)
     return axes
 
@@ -116,6 +119,16 @@ def plot_brain_surface_points(
     axes.scatter(*brain_surface_points[::ds, :].T, ".", c=colors, **scatter_kwargs)
     axes.set_aspect("equal")
     return axes
+
+
+def extent_from_corners(corners: dict) -> List:
+    # as used by matshow
+    return [
+        corners["topleft"][1],
+        corners["topright"][1],
+        corners["topleft"][0],
+        corners["bottomleft"][0],
+    ]
 
 
 # def plot_mlap_im_scatter(mlap_im, ref_surface_points, cs2d):

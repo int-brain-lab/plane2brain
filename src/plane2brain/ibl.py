@@ -30,7 +30,9 @@ def ibl_load_fov_data(
 
     session_path = _eid2path(eid=eid, one=one, location=location)
     # raw_imaging_meta = one.load_dataset(eid, "_ibl_rawImagingData.meta.json", collection=raw_imaging_collection)
-    with open(session_path / raw_imaging_collection / "_ibl_rawImagingData.meta.json", "r") as fH:
+    with open(
+        session_path / raw_imaging_collection / "_ibl_rawImagingData.meta.json", "r"
+    ) as fH:
         raw_imaging_meta = json.load(fH)
 
     # get FOV depths from scanimage meta
@@ -73,7 +75,9 @@ def ibl_get_reference_stack_path(
         raw_imaging_collection = infer_imaging_collection(eid, one, location)
     session_path = _eid2path(eid, one, location)
     reference_collection = session_path / raw_imaging_collection / "reference"
-    filepath = [p for p in reference_collection.glob("*") if "referenceImage.stack" in str(p)]
+    filepath = [
+        p for p in reference_collection.glob("*") if "referenceImage.stack" in str(p)
+    ]
     assert len(filepath) == 1
     return filepath[0]
 
@@ -102,7 +106,9 @@ def ibl_load_reference_stack_metadata(
     if location == "server":
         session_path = _eid2path(eid, one, location)
         reference_collection = session_path / raw_imaging_collection / "reference"
-        filepath = [p for p in reference_collection.glob("*") if "referenceImage.meta" in str(p)]
+        filepath = [
+            p for p in reference_collection.glob("*") if "referenceImage.meta" in str(p)
+        ]
         assert len(filepath) == 1
         filepath = filepath[0]
 
@@ -147,9 +153,13 @@ def infer_imaging_collection(eid: str, one: ONE, location="server") -> str:
     # TODO add non server usage
     session_path = _eid2path(eid=eid, one=one, location=location)
     assert session_path.exists()
-    raw_imaging_collections = [c for c in session_path.glob("*") if c.is_dir() and "raw_imaging_data" in str(c)]
+    raw_imaging_collections = [
+        c for c in session_path.glob("*") if c.is_dir() and "raw_imaging_data" in str(c)
+    ]
     collections = [c for c in raw_imaging_collections if (c / "reference").exists()]
-    assert len(collections) == 1, "multiple imaging collections with reference stack found"
+    assert len(collections) == 1, (
+        "multiple imaging collections with reference stack found"
+    )
     return collections[0].parts[-1]
 
 
@@ -163,7 +173,13 @@ def ibl_load_brain_surface_points(
     if raw_imaging_collection is None:
         raw_imaging_collection = infer_imaging_collection(eid, one, location)
 
-    with open(session_path / raw_imaging_collection / "reference" / "referenceImage.points.json", "r") as fH:
+    with open(
+        session_path
+        / raw_imaging_collection
+        / "reference"
+        / "referenceImage.points.json",
+        "r",
+    ) as fH:
         brain_surface_points = json.load(fH)
 
     return brain_surface_points

@@ -2,7 +2,10 @@
 
 from typing import Optional, Dict, List
 import numpy as np
-from plane2brain.coordinate_systems import LinkedCoordinateSystems, create_coordinate_system_for_image
+from plane2brain.coordinate_systems import (
+    LinkedCoordinateSystems,
+    create_coordinate_system_for_image,
+)
 import numpy.testing as nptest
 
 
@@ -26,10 +29,15 @@ def create_coordinate_systems_from_scanimage_meta(
     fov_uuids: Optional[List[str]] = None,
 ) -> Dict[str, LinkedCoordinateSystems]:
     # all, as they appear in order of the scanimage metadata file
-    scanimage_fov_metas = scanimage_meta["Artist"]["RoiGroups"]["imagingRoiGroup"]["rois"]
+    scanimage_fov_metas = scanimage_meta["Artist"]["RoiGroups"]["imagingRoiGroup"][
+        "rois"
+    ]
     if fov_uuids is not None:
         # in order of the fov_uuid list
-        scanimage_fov_metas = [[meta for meta in scanimage_fov_metas if meta["roiUuid"] == uuid][0] for uuid in fov_uuids]
+        scanimage_fov_metas = [
+            [meta for meta in scanimage_fov_metas if meta["roiUuid"] == uuid][0]
+            for uuid in fov_uuids
+        ]
 
     # pixel resolution from metadata
     um_per_px = get_resolution_from_scanimage_meta(scanimage_meta)
@@ -60,14 +68,15 @@ def create_coordinate_systems_from_scanimage_meta(
         # transform to reference coordinate frame
         fov_topleft_ref = fov_center_ref - fov_size_ref / 2
         fov_bottomright_ref = fov_topleft_ref + fov_size_ref
-        nptest.assert_array_almost_equal(fov_size_ref, fov_bottomright_ref - fov_topleft_ref)
+        nptest.assert_array_almost_equal(
+            fov_size_ref, fov_bottomright_ref - fov_topleft_ref
+        )
         ref_per_px = fov_size_ref / fov_size_px
         px_per_ref = 1 / ref_per_px
 
         # next wee need to know what is the size of a pixel in reference space?
         um_per_ref = um_per_px * px_per_ref
         ref_per_um = 1 / um_per_ref
-
         fov_topleft_um = fov_topleft_ref * um_per_ref
 
         cs2d = create_coordinate_system_for_image(
@@ -78,11 +87,18 @@ def create_coordinate_systems_from_scanimage_meta(
         )
 
         # the image size assertion
-        nptest.assert_array_almost_equal(cs2d.transform(fov_topleft_ref, "ref", "pixel"), np.zeros(2))
-        nptest.assert_array_almost_equal(cs2d.transform(fov_bottomright_ref, "ref", "pixel"), fov_size_px)
-        nptest.assert_array_almost_equal(cs2d.transform(np.zeros(2), "pixel", "ref"), fov_topleft_ref)
         nptest.assert_array_almost_equal(
-            cs2d.transform(fov_bottomright_ref, "ref", "um_global") - cs2d.transform(fov_topleft_ref, "ref", "um_global"),
+            cs2d.transform(fov_topleft_ref, "ref", "pixel"), np.zeros(2)
+        )
+        nptest.assert_array_almost_equal(
+            cs2d.transform(fov_bottomright_ref, "ref", "pixel"), fov_size_px
+        )
+        nptest.assert_array_almost_equal(
+            cs2d.transform(np.zeros(2), "pixel", "ref"), fov_topleft_ref
+        )
+        nptest.assert_array_almost_equal(
+            cs2d.transform(fov_bottomright_ref, "ref", "um_global")
+            - cs2d.transform(fov_topleft_ref, "ref", "um_global"),
             fov_size_um,
         )
         coordinate_systems[scanimage_fov_meta["roiUuid"]] = cs2d
@@ -94,7 +110,9 @@ def extract_fov_depths_from_scanimage_meta(
     raw_scanimage_meta: dict, scanimage_params: dict, uuids: List[str]
 ) -> Dict[str, np.float64]:
     # get the corresponding raw scanimage meta
-    scanimage_fov_metas = raw_scanimage_meta["Artist"]["RoiGroups"]["imagingRoiGroup"]["rois"]
+    scanimage_fov_metas = raw_scanimage_meta["Artist"]["RoiGroups"]["imagingRoiGroup"][
+        "rois"
+    ]
     fastz_pos = scanimage_params["hFastZ"]["position"]
     fov_depths = {}
     for uuid in uuids:

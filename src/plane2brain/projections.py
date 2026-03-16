@@ -19,7 +19,7 @@ from plane2brain.scanimage import create_coordinate_systems_from_scanimage_meta
 
 from plane2brain.atlas import ProjectionAtlas
 
-from typing import Literal, Tuple, Dict, List
+from typing import Tuple, Dict
 
 """
  
@@ -122,7 +122,7 @@ def project_from_scanimage_meta(
 
     # the 2d coordinate systems, by fov name
     fov_uuids = sorted(list(coords_px.keys()))
-    coordinate_systems = create_coordinate_systems_from_scanimage_meta(
+    coordinate_systems_2d = create_coordinate_systems_from_scanimage_meta(
         scanimage_meta,
         fov_uuids=fov_uuids,
     )
@@ -135,7 +135,7 @@ def project_from_scanimage_meta(
         # get the pixel data
         _coords_px = coords_px[fov_uuid][::ds]  # downsample factor for debugging
         # project into global um space
-        _coords_um = coordinate_systems[fov_uuid].transform(
+        _coords_um = coordinate_systems_2d[fov_uuid].transform(
             _coords_px,
             "pixel",
             "um_global",
@@ -151,7 +151,7 @@ def project_from_scanimage_meta(
             brain_normal_at_ref,
         )
 
-    return coords_projected, coordinate_systems, coordinate_systems_3d
+    return coords_projected, coordinate_systems_2d, coordinate_systems_3d
 
 
 """

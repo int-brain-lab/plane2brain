@@ -7,7 +7,6 @@ import numpy as np
 from numpy import linalg
 
 import numba as nb
-from numba.types import bool_, float64
 
 
 @nb.njit("Tuple((float64[:], float64[:]))(float64[:,:])")
@@ -209,7 +208,9 @@ def intersect_line_mesh_nb(
         if np.abs((np.abs(alpha) - np.pi / 2)) > tol:
             face = vertices[edges[i]]
             plane_point, plane_normal = plane_normal_form(face)
-            intersection_point = intersect_line_plane_nb(line_point, line_vector, plane_point, plane_normal)
+            intersection_point = intersect_line_plane_nb(
+                line_point, line_vector, plane_point, plane_normal
+            )
             if point_in_face(face, intersection_point):
                 vertices_to_check[i] = True
 
@@ -220,7 +221,9 @@ def intersect_line_mesh_nb(
         i = ix[j]
         face = vertices[edges[i]]
         plane_point, plane_normal = plane_normal_form(face)
-        intersection_points[j] = intersect_line_plane_nb(line_point, line_vector, plane_point, plane_normal)
+        intersection_points[j] = intersect_line_plane_nb(
+            line_point, line_vector, plane_point, plane_normal
+        )
         faces[j] = face
 
     return (
@@ -304,7 +307,9 @@ def find_closest_points_on_surface(
     N = points_eval.shape[0]
     points_closest = np.zeros((N, 3))
     for i in nb.prange(N):
-        points_closest[i, :] = find_closest_point_from_line_nb(brain_surface_points, points_eval[i], n)
+        points_closest[i, :] = find_closest_point_from_line_nb(
+            brain_surface_points, points_eval[i], n
+        )
     return points_closest
 
 
