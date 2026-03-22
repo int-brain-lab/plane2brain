@@ -118,9 +118,9 @@ coords = projections.project_scanimage_fovs(
 # extract depths
 fov_uuids = sorted(list(fov_map.values()))
 fov_depths = extract_fov_depths_from_scanimage_meta(
-    raw_imaging_meta["rawScanImageMeta"],
-    raw_imaging_meta["scanImageParams"],
-    fov_uuids,
+    scanimage_meta=raw_imaging_meta["rawScanImageMeta"],
+    scanimage_params=raw_imaging_meta["scanImageParams"],
+    fov_uuids=fov_uuids,
 )
 
 # project down
@@ -198,7 +198,7 @@ coordinate_systems_3d.plot(axes=axes, color_by="axis", scale=500)
 if not SAVE_OUTPUT:
     for name, uuid in fov_map.items():
         session_folder = BASE_FOLDER / one.eid2path(eid).session_path_short()
-        coords_mlapdv = coords[uuid]["reprojected"]["mlapdv"]
+        coords_mlapdv = coords[uuid]["mlapdv"]
         # saving the updated coordinates
         np.save(
             session_folder / "alf" / name / "mpciROIs.mlapdv_v2.npy",
