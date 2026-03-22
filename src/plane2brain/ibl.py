@@ -72,8 +72,8 @@ def ibl_get_reference_stack_path(
     location: str = "server",
 ) -> np.ndarray:
     if raw_imaging_collection is None:
-        raw_imaging_collection = infer_imaging_collection(eid, one, location)
-    session_path = _eid2path(eid, one, location)
+        raw_imaging_collection = infer_imaging_collection(eid, one, location=location)
+    session_path = _eid2path(eid, one, location=location)
     reference_collection = session_path / raw_imaging_collection / "reference"
     filepath = [
         p for p in reference_collection.glob("*") if "referenceImage.stack" in str(p)
@@ -89,8 +89,8 @@ def ibl_load_reference_stack(
     location: str = "server",
 ) -> np.ndarray:
     if raw_imaging_collection is None:
-        raw_imaging_collection = infer_imaging_collection(eid, one, location)
-    filepath = ibl_get_reference_stack_path(eid, one, location)
+        raw_imaging_collection = infer_imaging_collection(eid, one, location=location)
+    filepath = ibl_get_reference_stack_path(eid, one, location=location)
     return tifffile.imread(filepath)  # (dv, ml, ap)
 
 

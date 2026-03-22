@@ -85,12 +85,69 @@ def project_down_from_surface(
     return coords_mlapdv
 
 
-# def setup_coordinate_systems_from_scanimage_meta(
-#     scanimage_meta: dict,
-# ) -> Tuple[LinkedCoordinateSystems, LinkedCoordinateSystems]: ...
+def setup_coordinate_systems_from_scanimage_meta(
+    scanimage_meta: dict,
+    common_point_mlap: np.ndarray,
+    atlas: ProjectionAtlas,
+    scanner_orientation: dict,
+    fov_uuids: list[str],
+) -> Tuple[LinkedCoordinateSystems, LinkedCoordinateSystems]:
+    # and creating the coordinate system
+    # TODO integrate ref point 0,0 differnces
+    # ref_point_mlap == craniotomy center
+    ref_point_mlapdv, brain_normal_at_ref = atlas.get_plane_at_point_mlap(
+        *common_point_mlap,
+        numba=True,
+    )
+    coordinate_systems_3d = setup_coordinate_systems_3d(
+        ref_point_mlapdv,
+        brain_normal_at_ref,
+        rotate_by=scanner_orientation["rotation"],
+        invert_dims=scanner_orientation["invert_axis"],
+    )
+
+    # the 2d coordinate systems, by fov name
+    coordinate_systems_2d = create_coordinate_systems_from_scanimage_meta(
+        scanimage_meta,
+        fov_uuids=fov_uuids,
+    )
+    return coordinate_systems_2d, coordinate_systems_3d
+    # coordinate_systems_fovs = dict(zip(fov_names, coordinate_systems))
+    # axes = plotters.plot_brain_surface_points(brain_surface_points)
 
 
-# def project_scanimage_multifov_data(coords: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]: ...
+def project_scanimage_fovs(
+    coords_px: Dict[str, np.ndarray],
+    coordinate_systems_2d,
+    coordinate_systems_3d,
+    atlas: ProjectionAtlas,
+    projection_vector: np.ndarray,
+    ds: int = 1,
+) -> Dict[str, np.ndarray]:
+    coords_projected = {}
+    fov_uuids = sorted(list(coords_px.keys()))
+    for fov_uuid in fov_uuids:
+        coords_projected[fov_uuid] = {}
+        # get the pixel data
+        _coords_px = coords_px[fov_uuid][::ds]  # downsample factor for debugging
+        # project into global um space
+        _coords_um = coordinate_systems_2d[fov_uuid].transform(
+            _coords_px,
+            "pixel",
+            "um_global",
+        )
+        coords_projected[fov_uuid]["pixel"] = _coords_px
+        coords_projected[fov_uuid]["um"] = _coords_um
+
+        # project onto brain atlas
+        coords_projected[fov_uuid]["on_surface"] = project_coords_onto_atlas_surface(
+            _coords_um,
+            coordinate_systems_3d,
+            atlas,
+            projection_vector,
+        )
+
+    return coords_projected
 
 
 # TODO this function should be project multi fov or similar

@@ -9,6 +9,13 @@ from plane2brain.coordinate_systems import (
 import numpy.testing as nptest
 
 
+def _get_fov_uuids(scanimage_meta: dict) -> list:
+    scanimage_fov_metas = scanimage_meta["Artist"]["RoiGroups"]["imagingRoiGroup"][
+        "rois"
+    ]
+    return [meta["roiUuid"] for meta in scanimage_fov_metas]
+
+
 def get_resolution_from_scanimage_meta(scanimage_meta: dict) -> np.ndarray:
     # X is the line scan (resonant)
     # are the individual lines, e.g. 512 pixels per line and 512 lines
@@ -28,16 +35,19 @@ def create_coordinate_systems_from_scanimage_meta(
     scanimage_meta: dict,
     fov_uuids: Optional[List[str]] = None,
 ) -> Dict[str, LinkedCoordinateSystems]:
-    # all, as they appear in order of the scanimage metadata file
-    scanimage_fov_metas = scanimage_meta["Artist"]["RoiGroups"]["imagingRoiGroup"][
-        "rois"
+    # all FOVs or subselection
+    if fov_uuids is None:
+        fov_uuids = _get_fov_uuids(scanimage_meta)
+
+    # get scanimage metadata for the selected FOVs
+    scanimage_fov_metas = [
+        [
+            meta
+            for meta in scanimage_meta["Artist"]["RoiGroups"]["imagingRoiGroup"]["rois"]
+            if meta["roiUuid"] == uuid
+        ][0]
+        for uuid in fov_uuids
     ]
-    if fov_uuids is not None:
-        # in order of the fov_uuid list
-        scanimage_fov_metas = [
-            [meta for meta in scanimage_fov_metas if meta["roiUuid"] == uuid][0]
-            for uuid in fov_uuids
-        ]
 
     # pixel resolution from metadata
     um_per_px = get_resolution_from_scanimage_meta(scanimage_meta)
@@ -107,15 +117,26 @@ def create_coordinate_systems_from_scanimage_meta(
 
 
 def extract_fov_depths_from_scanimage_meta(
-    raw_scanimage_meta: dict, scanimage_params: dict, uuids: List[str]
+    scanimage_meta: dict,
+    scanimage_params: dict,
+    fov_uuids: Optional[List[str]] = None,
 ) -> Dict[str, np.float64]:
-    # get the corresponding raw scanimage meta
-    scanimage_fov_metas = raw_scanimage_meta["Artist"]["RoiGroups"]["imagingRoiGroup"][
+    """from scanimage metadata, extract the imaged depths of all field of views,
+    return as a dict with fov name (uuids) and corresponding depth"""
+    if fov_uuids is None:
+        fov_uuids = _get_fov_uuids(scanimage_meta)
+
+    # get the metadata for the fovs by given uuids
+    scanimage_fov_metas = scanimage_meta["Artist"]["RoiGroups"]["imagingRoiGroup"][
         "rois"
     ]
+    # extract the depth - a combination of the voicecoil (fast-z)
+    # and gantry position
     fastz_pos = scanimage_params["hFastZ"]["position"]
     fov_depths = {}
-    for uuid in uuids:
-        (fov_meta,) = [meta for meta in scanimage_fov_metas if meta["roiUuid"] == uuid]
-        fov_depths[uuid] = -1 * (fov_meta["zs"] + fastz_pos)
+    for fov_uuid in fov_uuids:
+        (fov_meta,) = [
+            meta for meta in scanimage_fov_metas if meta["roiUuid"] == fov_uuid
+        ]
+        fov_depths[fov_uuid] = -1 * (fov_meta["zs"] + fastz_pos)
     return fov_depths
