@@ -1,29 +1,23 @@
 # %%
 from pathlib import Path
-
 import numpy as np
 
 from plane2brain import plotters, projections
-
 from plane2brain.atlas import ProjectionAtlas
-
 from plane2brain.scanimage import (
+    get_resolution_from_scanimage_meta,
     extract_fov_depths_from_scanimage_meta,
     create_coordinate_systems_from_scanimage_meta,
-    get_resolution_from_scanimage_meta,
 )
 from plane2brain.coordinate_systems import (
     setup_coordinate_systems_3d,
     create_coordinate_system_for_ref,
 )
-
-from one.api import ONE
-
 import plane2brain.ibl as ibl
 from plane2brain.suite2p import suite2p_data_loader
 
+from one.api import ONE
 import matplotlib.pyplot as plt
-
 
 # %% whiterussian / local server base folder
 BASE_FOLDER = Path("/mnt/s0/Data/Subjects")
@@ -187,7 +181,7 @@ coords = projections.project_scanimage_fovs(
     coordinate_systems_3d,
     atlas=atlas,
     projection_vector=optical_axis,  # now project along the optical axis
-    ds=10,
+    # ds=10,
 )
 
 # extract depths
@@ -197,8 +191,15 @@ fov_depths = extract_fov_depths_from_scanimage_meta(
     scanimage_params=raw_imaging_meta["scanImageParams"],
     fov_uuids=fov_uuids,
 )
-
 # this creates: the keys 'um_corrected' and 'dv_below_surface'
+coords = projections.correct_coords_for_tilt_2d(
+    coords,
+    coordinate_systems_2d,
+    fov_depths,
+    p_surface,
+    n_surface,
+)
+
 # the use of um_corrected requires a new projection
 for uuid in list(coords.keys()):
     coords_on_surface = projections.project_coords_onto_atlas_surface(
@@ -213,6 +214,21 @@ for uuid in list(coords.keys()):
         coords_depths=coords[uuid]["dv_below_surface"],
     )
     coords[uuid]["reprojected"] = coords_reprojected  # this is mlapdv
+
+
+# %% some quantification of differences
+for name, uuid in fov_map.items():
+    _coords = coords[uuid]["pixel"]
+    coords_um = coordinate_systems_2d[uuid].transform(_coords, "pixel", "um_global")
+    xy_min = np.min(coords_um - coords[uuid]["um_corrected"], axis=0)
+    xy_max = np.max(coords_um - coords[uuid]["um_corrected"], axis=0)
+    dv_min = np.min((dv_avg - fov_depths[uuid]) - coords[uuid]["dv_below_surface"])
+    dv_max = np.max((dv_avg - fov_depths[uuid]) - coords[uuid]["dv_below_surface"])
+    print(f"-- {name} --")
+    print(f"x: min/max {xy_min[0]:.2f}/{xy_max[0]:.2f}")
+    print(f"y: min/max {xy_min[1]:.2f}/{xy_max[1]:.2f}")
+    print(f"dv: min/max {dv_min:.2f}/{dv_max:.2f}")
+    print()
 
 # %% map anything mlapdv to brain area
 for name, uuid in fov_map.items():
@@ -263,6 +279,13 @@ for name, uuid in fov_map.items():
         s=2,
         color=coords[uuid]["atlas_rgba"] / 255,
     )
+
+    plotters.plot_points(
+        coords[uuid]["reprojected"],
+        axes=axes,
+        s=2,
+        color="k",
+    )
 coordinate_systems_3d.plot(axes=axes, color_by="axis", scale=500)
 
 # %%
@@ -283,10 +306,7 @@ if not SAVE_OUTPUT:
         coords_mlapdv = coords[uuid]["reprojected"]
         # saving the updated coordinates
         np.save(
-            session_folder
-            / "alf"
-            / name
-            / "mpciROIs.mlapdv_v3.npy",  # FIXME better naming
+            session_folder / "alf" / name / "mpciROIs.mlapdv_angle_projection.npy",
             coords_mlapdv,
         )
         # saving the atlas ids
@@ -295,6 +315,8 @@ if not SAVE_OUTPUT:
             session_folder
             / "alf"
             / name
-            / "mpciROIs.brainLocationIds_ccf_2017_v3.npy",  # FIXME better naming
+            / "mpciROIs.brainLocationIds_ccf_2017_angle_projection.npy",
             atlas_ids,
         )
+
+# %%

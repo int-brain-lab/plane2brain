@@ -1,12 +1,9 @@
 # %%
 from pathlib import Path
-
 import numpy as np
 
 from plane2brain import plotters, projections
-
 from plane2brain.atlas import ProjectionAtlas
-
 from plane2brain.scanimage import (
     extract_fov_depths_from_scanimage_meta,
     create_coordinate_systems_from_scanimage_meta,
@@ -14,12 +11,10 @@ from plane2brain.scanimage import (
 from plane2brain.coordinate_systems import (
     setup_coordinate_systems_3d,
 )
-
-from one.api import ONE
-
 import plane2brain.ibl as ibl
 from plane2brain.suite2p import suite2p_data_loader
 
+from one.api import ONE
 import matplotlib.pyplot as plt
 
 
@@ -110,7 +105,7 @@ coords = projections.project_scanimage_fovs(
     coordinate_systems_3d,
     atlas=atlas,
     projection_vector=brain_normal_at_ref,
-    ds=10,
+    # ds=10,
 )
 
 # %% projecting down from surface
@@ -201,12 +196,15 @@ if not SAVE_OUTPUT:
         coords_mlapdv = coords[uuid]["mlapdv"]
         # saving the updated coordinates
         np.save(
-            session_folder / "alf" / name / "mpciROIs.mlapdv_v2.npy",
+            session_folder / "alf" / name / "mpciROIs.mlapdv_vanilla_projection.npy",
             coords_mlapdv,
         )
         # saving the atlas ids
         atlas_ids = atlas.get_labels_for_mlapdv(coords_mlapdv)[0]
         np.save(
-            session_folder / "alf" / name / "mpciROIs.brainLocationIds_ccf_2017_v2.npy",
+            session_folder
+            / "alf"
+            / name
+            / "mpciROIs.brainLocationIds_ccf_2017_vanilla_projection.npy",
             atlas_ids,
         )

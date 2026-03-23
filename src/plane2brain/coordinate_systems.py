@@ -322,6 +322,7 @@ def create_coordinate_system_for_image(
 
 
 def get_image_corners(img_size_px, coordinate_systems, to="um"):
+    img_size_px = np.array(img_size_px)
     corners = dict(
         topleft=[0, 0],
         topright=[0, img_size_px[1]],

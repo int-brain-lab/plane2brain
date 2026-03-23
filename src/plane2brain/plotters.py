@@ -123,11 +123,12 @@ def plot_brain_surface_points(
 
 def extent_from_corners(corners: dict) -> List:
     # as used by matshow
+    # (left, right, bottom, top)
     return [
         corners["topleft"][1],
         corners["topright"][1],
-        corners["topleft"][0],
         corners["bottomleft"][0],
+        corners["topleft"][0],
     ]
 
 

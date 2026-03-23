@@ -1,31 +1,26 @@
 # %%
 from pathlib import Path
-
 import numpy as np
 
 from plane2brain import plotters, projections
-
 from plane2brain.atlas import ProjectionAtlas
-
 from plane2brain.scanimage import (
+    get_resolution_from_scanimage_meta,
     extract_fov_depths_from_scanimage_meta,
     create_coordinate_systems_from_scanimage_meta,
-    get_resolution_from_scanimage_meta,
 )
 from plane2brain.coordinate_systems import (
     setup_coordinate_systems_3d,
     create_coordinate_system_for_ref,
 )
-
-from one.api import ONE
-
-from ibllib.mpci.registration import register_reference_stacks
-import skimage
-
 import plane2brain.ibl as ibl
 from plane2brain.suite2p import suite2p_data_loader
 
+from one.api import ONE
 import matplotlib.pyplot as plt
+
+from ibllib.mpci.registration import register_reference_stacks
+import skimage
 
 
 # %% whiterussian / local server base folder
@@ -107,11 +102,11 @@ um_per_px = get_resolution_from_scanimage_meta(
 )  # in X,Y
 ref_img_size_um = ref_img_size_px * um_per_px
 
+# %%
+
 # from the transform we computed between the reference stacks (of the session at hand
 # and the reference session)
 # we take the translation component to integrate it here by shifting the ref point
-
-# %% first we need to get the transform
 
 # reference session for SP058: "SP058/2024-08-14/001"
 eid_ref = one.ref2eid(dict(subject="SP058", date="2024-08-14", sequence="001"))
@@ -146,7 +141,7 @@ ref_transform = skimage.transform.EuclideanTransform(
 )
 
 # FIXME somthing similar to this
-# TODO check the dimensions
+# TODO check the dimensions, verify if plus or minus etc
 ref_point_mlap = ref_point_mlap + transform_params["translation"] * um_per_px
 
 # TODO - deal with the entire situation of the reference image and it's axis
@@ -160,6 +155,37 @@ coordinate_systems_ref = create_coordinate_system_for_ref(
     ref_img_topleft_um,
 )
 # what is this coordinate system used for? Potentially we will need this only for the mpci.meanImage coordinates
+
+# %% a plotter with a coordinate system
+from plane2brain.coordinate_systems import get_image_corners
+
+image = ref_img_stack[5]
+coordinate_sytems = coordinate_systems_ref
+
+fig, axes = plt.subplots()
+corners = get_image_corners(image.shape, coordinate_sytems)
+
+kwargs = dict(
+    extent=plotters.extent_from_corners(corners),
+    vmin=np.percentile(ref_img_stack, 1),
+    vmax=np.percentile(ref_img_stack, 99.9),
+)
+axes.matshow(image, **kwargs)
+axes.set_aspect("equal")
+kwargs = dict(linestyle=":", lw=1, alpha=1, color="w")
+axes.axhline(0, **kwargs)
+axes.axvline(0, **kwargs)
+_ref_point_mlap = (
+    ref_point_mlap[1],
+    ref_point_mlap[0],
+)  # this inversion is because the ml, ap (and ml is Y axis = 1)
+for d in [2300, 2500, 2700]:
+    circle = plt.Circle(_ref_point_mlap, d, fill=False, color="w", alpha=0.5)
+    axes.add_patch(circle)
+axes.set_xlabel("X")
+axes.set_ylabel("Y")
+
+# %%
 """
 ######## #### ##       ########       ###    ########        ## ##     ##  ######  ########
    ##     ##  ##          ##         ## ##   ##     ##       ## ##     ## ##    ##    ##
