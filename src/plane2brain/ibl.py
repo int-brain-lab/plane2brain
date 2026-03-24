@@ -4,6 +4,7 @@ import zipfile
 import tifffile
 import json
 import numpy as np
+import subprocess
 
 from one.api import ONE
 
@@ -26,14 +27,21 @@ def ibl_load_fov_data(
 ):
     # get data
     if raw_imaging_collection is None:
-        raw_imaging_collection = infer_imaging_collection(eid, one, location)
+        raw_imaging_collection = infer_imaging_collection(eid, one, location=location)
 
     session_path = _eid2path(eid=eid, one=one, location=location)
-    # raw_imaging_meta = one.load_dataset(eid, "_ibl_rawImagingData.meta.json", collection=raw_imaging_collection)
-    with open(
-        session_path / raw_imaging_collection / "_ibl_rawImagingData.meta.json", "r"
-    ) as fH:
-        raw_imaging_meta = json.load(fH)
+
+    match location:
+        case "server":
+            with open(
+                session_path / raw_imaging_collection / "_ibl_rawImagingData.meta.json",
+                "r",
+            ) as fH:
+                raw_imaging_meta = json.load(fH)
+        case "local":
+            raw_imaging_meta = one.load_dataset(
+                eid, "_ibl_rawImagingData.meta.json", collection=raw_imaging_collection
+            )
 
     # get FOV depths from scanimage meta
     # scanimage_meta = raw_imaging_meta["rawScanImageMeta"]
@@ -50,17 +58,28 @@ def ibl_load_fov_data(
     # the paths of the suite2p output
     stat_paths = {}
     for fov in fov_names:
-        # if location == 'LOCAL_SERVER':
-        # session_folder = BASE_FOLDER / one.eid2path(eid).session_path_short()
-        session_folder = _eid2path(eid, one, location)
-        zip_path = next((session_folder / "alf" / fov).glob("*ROIData.raw.zip"))
-        stat_path = zip_path.parent / zip_path.stem / "stat.npy"
-        if not stat_path.exists():
-            # if stat path doesn't exist, extract it
-            stat_path.parent.mkdir(exist_ok=True)
-            with zipfile.ZipFile(zip_path, "r") as z:
-                z.extractall(stat_path.parent)
-        stat_paths[fov] = stat_path
+        session_folder = _eid2path(eid, one, location=location)
+        match location:
+            case "server":
+                zip_path = next((session_folder / "alf" / fov).glob("*ROIData.raw.zip"))
+                stat_path = zip_path.parent / zip_path.stem / "stat.npy"
+                if not stat_path.exists():
+                    # if stat path doesn't exist, extract it
+                    stat_path.parent.mkdir(exist_ok=True)
+                    with zipfile.ZipFile(zip_path, "r") as z:
+                        z.extractall(stat_path.parent)
+                stat_paths[fov] = stat_path
+            case "local":
+                zip_path = one.load_dataset(
+                    eid, "*ROIData.raw.zip", collection=f"alf/{fov}", download_only=True
+                )
+                stat_path = zip_path.parent / zip_path.stem / "stat.npy"
+                if not stat_path.exists():
+                    # if stat path doesn't exist, extract it
+                    stat_path.parent.mkdir(exist_ok=True)
+                    with zipfile.ZipFile(zip_path, "r") as z:
+                        z.extractall(stat_path.parent)
+                stat_paths[fov] = stat_path
 
     return raw_imaging_meta, stat_paths, fov_map
 
@@ -74,12 +93,23 @@ def ibl_get_reference_stack_path(
     if raw_imaging_collection is None:
         raw_imaging_collection = infer_imaging_collection(eid, one, location=location)
     session_path = _eid2path(eid, one, location=location)
-    reference_collection = session_path / raw_imaging_collection / "reference"
-    filepath = [
-        p for p in reference_collection.glob("*") if "referenceImage.stack" in str(p)
-    ]
-    assert len(filepath) == 1
-    return filepath[0]
+    match location:
+        case "server":
+            reference_collection = session_path / raw_imaging_collection / "reference"
+            filepath = [
+                p
+                for p in reference_collection.glob("*")
+                if "referenceImage.stack" in str(p)
+            ]
+            assert len(filepath) == 1, "multiple reference stacks found"
+            filepath = filepath[0]
+        case "local":
+            filepath = one.load_dataset(
+                eid,
+                "*referenceImage.stack",
+                collection=f"{raw_imaging_collection}/reference",
+            )
+    return filepath
 
 
 def ibl_load_reference_stack(
@@ -102,24 +132,27 @@ def ibl_load_reference_stack_metadata(
 ) -> Tuple[Dict, np.ndarray, np.ndarray]:
     # get the coordinates of the reference point
     if raw_imaging_collection is None:
-        raw_imaging_collection = infer_imaging_collection(eid, one, location)
-    if location == "server":
-        session_path = _eid2path(eid, one, location)
-        reference_collection = session_path / raw_imaging_collection / "reference"
-        filepath = [
-            p for p in reference_collection.glob("*") if "referenceImage.meta" in str(p)
-        ]
-        assert len(filepath) == 1
-        filepath = filepath[0]
+        raw_imaging_collection = infer_imaging_collection(eid, one, location=location)
+    match location:
+        case "server":
+            session_path = _eid2path(eid, one, location=location)
+            reference_collection = session_path / raw_imaging_collection / "reference"
+            filepath = [
+                p
+                for p in reference_collection.glob("*")
+                if "referenceImage.meta" in str(p)
+            ]
+            assert len(filepath) == 1
+            filepath = filepath[0]
 
-        with open(filepath, "r") as fH:
-            ref_img_meta = json.load(fH)
-    else:
-        ref_img_meta = one.load_dataset(
-            eid,
-            "*referenceImage.meta",
-            collection=raw_imaging_collection,
-        )
+            with open(filepath, "r") as fH:
+                ref_img_meta = json.load(fH)
+        case "local":
+            ref_img_meta = one.load_dataset(
+                eid,
+                "*referenceImage.meta",
+                collection=raw_imaging_collection,
+            )
     return ref_img_meta
 
 
@@ -152,15 +185,31 @@ def infer_imaging_collection(eid: str, one: ONE, location="server") -> str:
     # infer the imaging collection
     # TODO add non server usage
     session_path = _eid2path(eid=eid, one=one, location=location)
-    assert session_path.exists()
-    raw_imaging_collections = [
-        c for c in session_path.glob("*") if c.is_dir() and "raw_imaging_data" in str(c)
-    ]
-    collections = [c for c in raw_imaging_collections if (c / "reference").exists()]
-    assert len(collections) == 1, (
-        "multiple imaging collections with reference stack found"
-    )
-    return collections[0].parts[-1]
+    match location:
+        case "server":
+            assert session_path.exists()
+            raw_imaging_collections = [
+                c
+                for c in session_path.glob("*")
+                if c.is_dir() and "raw_imaging_data" in str(c)
+            ]
+            collections = [
+                c for c in raw_imaging_collections if (c / "reference").exists()
+            ]
+            assert len(collections) == 1, (
+                "multiple imaging collections with reference stack found"
+            )
+            return collections[0].parts[-1]
+        case "local":
+            collections = [
+                c
+                for c in one.list_collections(eid)
+                if "raw_imaging_data" in c and "reference" in c
+            ]
+            assert len(collections) == 1, (
+                "multiple imaging collections with reference stack found"
+            )
+            return collections[0].split("/")[0]
 
 
 def ibl_load_brain_surface_points(
@@ -173,14 +222,58 @@ def ibl_load_brain_surface_points(
     if raw_imaging_collection is None:
         raw_imaging_collection = infer_imaging_collection(eid, one, location)
 
-    with open(
-        session_path
-        / raw_imaging_collection
-        / "reference"
-        / "referenceImage.points.json",
-        "r",
-    ) as fH:
-        brain_surface_points = json.load(fH)
+    match location:
+        case "server":
+            with open(
+                session_path
+                / raw_imaging_collection
+                / "reference"
+                / "referenceImage.points.json",
+                "r",
+            ) as fH:
+                brain_surface_points = json.load(fH)
+        case "local":
+            datasets = one.list_datasets(
+                eid, collection=f"{raw_imaging_collection}/reference"
+            )
+            dataset = [d for d in datasets if "referenceImage.points" in d]
+            # if dataset is registered on alyx, use one.
+            if len(dataset) == 1:
+                brain_surface_points = one.load_dataset(
+                    eid,
+                    "*referenceImage.points.json",
+                    collection=f"{raw_imaging_collection}/reference",
+                )
+            # if it isn't, try to load locally (or copy)
+            elif len(dataset) == 0:
+                print("reference points not registered on alyx")
+                remote_path = (
+                    _eid2path(eid, one, location="server")
+                    / raw_imaging_collection
+                    / "reference"
+                    / "referenceImage.points.json"
+                )
+                local_path = (
+                    one.eid2path(eid)
+                    / raw_imaging_collection
+                    / "reference"
+                    / "referenceImage.points.json"
+                )
+                if not local_path.exists():  # attempt to copy
+                    cmd = f"scp -v mbox-whiterussian:{remote_path} {local_path}"  # This only work with my own SSH setup and is throwaway code ...
+                    res = subprocess.run(
+                        cmd, shell=True, capture_output=True, text=True
+                    )
+                    if res.returncode != 0:
+                        raise subprocess.CalledProcessError(
+                            returncode=res.returncode,
+                            cmd=res.args,
+                            output=res.stdout,
+                            stderr=res.stderr,
+                        )
+                print("loading reference points from local path")
+                with open(local_path, "r") as fH:
+                    brain_surface_points = json.load(fH)
 
     return brain_surface_points
     # the surface points are written into the metadata
