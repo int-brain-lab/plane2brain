@@ -125,6 +125,9 @@ class LinkedCoordinateSystems:
     def get(self, name: str):
         return self.coordinate_systems[name]
 
+    def __repr__(self):
+        return f"{type(self)} with named coordinate systems: {list(self.coordinate_systems.keys())}"
+
 
 # TODO refactor
 def cs3d_from_normal(
@@ -282,12 +285,26 @@ def create_coordinate_system_for_image(
 
     coordinate_systems = LinkedCoordinateSystems(
         dict(
-            ref=CoordinateSystem(basis=np.identity(2), origin=np.zeros(2)),
-            pixel=CoordinateSystem(basis=np.diag(ref_per_px), origin=img_topleft_ref),
-            um_image=CoordinateSystem(
-                basis=np.diag(ref_per_um), origin=img_topleft_ref
+            ref=CoordinateSystem(
+                basis=np.identity(2),
+                origin=np.zeros(2),
             ),
-            um_global=CoordinateSystem(basis=np.diag(ref_per_um), origin=np.zeros(2)),
+            pixel=CoordinateSystem(
+                basis=np.diag(ref_per_px),
+                origin=img_topleft_ref,
+            ),
+            um_image=CoordinateSystem(
+                basis=np.diag(ref_per_um),
+                origin=img_topleft_ref,
+            ),
+            image=CoordinateSystem(
+                basis=np.diag(ref_per_um * img_size_um),
+                origin=img_topleft_ref,
+            ),
+            um_global=CoordinateSystem(
+                basis=np.diag(ref_per_um),
+                origin=np.zeros(2),
+            ),
             # TODO docme here why the origin of um is also 0,0
             # because in our use case both ref and um share the same origin
             # doens't need to be the case though!
@@ -318,6 +335,20 @@ def create_coordinate_system_for_image(
             - coordinate_systems.transform(img_topleft_ref, "ref", "um_global"),
             img_size_um,
         )
+        nptest.assert_array_almost_equal(
+            coordinate_systems.transform(np.zeros(2), "pixel", "image"), np.zeros(2)
+        )
+        nptest.assert_array_almost_equal(
+            coordinate_systems.transform(img_size_px, "pixel", "image"), np.ones(2)
+        )
+        nptest.assert_array_almost_equal(
+            coordinate_systems.transform(np.ones(2), "image", "pixel"),
+            img_size_px,
+        )
+        nptest.assert_array_almost_equal(
+            coordinate_systems.transform(np.ones(2), "image", "um_image"),
+            img_size_um,
+        )
     return coordinate_systems
 
 
@@ -331,7 +362,6 @@ def get_image_corners(img_size_px, coordinate_systems, to="um"):
         center=img_size_px / 2,
     )
     # this is correct by visual inspection
-
     return {
         name: coordinate_systems.transform(np.array(corner), "pixel", to)
         for name, corner in corners.items()
