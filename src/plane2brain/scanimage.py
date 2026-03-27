@@ -31,6 +31,18 @@ def get_resolution_from_scanimage_meta(scanimage_meta: dict) -> np.ndarray:
     return um_per_px
 
 
+def get_fov_meta(
+    scanimage_meta: dict,
+    fov_uuid: str,
+) -> dict:
+    (scanimage_fov_meta,) = [
+        meta
+        for meta in scanimage_meta["Artist"]["RoiGroups"]["imagingRoiGroup"]["rois"]
+        if meta["roiUuid"] == fov_uuid
+    ]
+    return scanimage_fov_meta
+
+
 def create_coordinate_systems_from_scanimage_meta(
     scanimage_meta: dict,
     fov_uuids: Optional[List[str]] = None,
@@ -39,21 +51,12 @@ def create_coordinate_systems_from_scanimage_meta(
     if fov_uuids is None:
         fov_uuids = _get_fov_uuids(scanimage_meta)
 
-    # get scanimage metadata for the selected FOVs
-    scanimage_fov_metas = [
-        [
-            meta
-            for meta in scanimage_meta["Artist"]["RoiGroups"]["imagingRoiGroup"]["rois"]
-            if meta["roiUuid"] == uuid
-        ][0]
-        for uuid in fov_uuids
-    ]
-
     # pixel resolution from metadata
     um_per_px = get_resolution_from_scanimage_meta(scanimage_meta)
     coordinate_systems = {}
 
-    for scanimage_fov_meta in scanimage_fov_metas:
+    for fov_uuid in fov_uuids:
+        scanimage_fov_meta = get_fov_meta(scanimage_meta, fov_uuid)
         # misleading variable naming by scanimage but here too X is the line and Y is the line number
         fov_size_px = np.array(scanimage_fov_meta["scanfields"]["pixelResolutionXY"])
         fov_size_um = fov_size_px * um_per_px
@@ -111,7 +114,7 @@ def create_coordinate_systems_from_scanimage_meta(
             - cs2d.transform(fov_topleft_ref, "ref", "um_global"),
             fov_size_um,
         )
-        coordinate_systems[scanimage_fov_meta["roiUuid"]] = cs2d
+        coordinate_systems[fov_uuid] = cs2d
 
     return coordinate_systems
 

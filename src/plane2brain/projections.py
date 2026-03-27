@@ -53,7 +53,9 @@ def project_coords_onto_atlas_surface(
     )
     # project the rois onto the brain surface along the brain normal
     coords_on_surface = np.zeros_like(coords_on_imaging_plane)
-    for i, _coords in enumerate(tqdm(coords_on_imaging_plane)):
+    for i, _coords in enumerate(
+        tqdm(coords_on_imaging_plane, desc="projecting on surface")
+    ):
         try:
             faces, intersection_points, ix = intersect_line_mesh_nb(
                 atlas.mesh["vertices"],
@@ -76,7 +78,7 @@ def project_down_from_surface(
     coords_depths: np.ndarray,
 ) -> np.ndarray:
     coords_mlapdv = np.zeros_like(coords_on_surface)
-    for i, point in enumerate(tqdm(coords_on_surface)):
+    for i, point in enumerate(tqdm(coords_on_surface, desc="projecting into brain")):
         p, n = atlas.get_plane_at_point_mlap(point[0], point[1], numba=True)
         coords_mlapdv[i] = (
             p + n * -1 * coords_depths[i]

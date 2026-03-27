@@ -132,6 +132,18 @@ def extent_from_corners(corners: dict) -> List:
     ]
 
 
+def plot_fov_outline_from_corners(corners: dict, axes=None, **line_kwargs):
+    if axes is None:
+        _, axes = plt.subplots()
+
+    line_kwargs.setdefault("lw", 1)
+    line_kwargs.setdefault("color", "k")
+    edges = ["topleft", "topright", "bottomright", "bottomleft", "topleft"]
+    axes.plot(*np.array([corners[e] for e in edges]).T, **line_kwargs)
+    axes.set_aspect("equal")
+    return axes
+
+
 # def plot_mlap_im_scatter(mlap_im, ref_surface_points, cs2d):
 #     # mlap_im: a (n_px, 3) array, columns are ml, ap, im (im = image value at coordinates)
 #     fig, axes = plt.subplots()

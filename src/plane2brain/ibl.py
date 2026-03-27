@@ -281,3 +281,30 @@ def ibl_load_brain_surface_points(
     # assert "points" in ref_img_meta
     # brain_surface_points = ref_img_meta["points"]
     # return brain_surface_points
+
+def ibl_load_roi_mlapdv(
+    eid: str,
+    one: ONE,
+    fov: str = 'FOV_00',
+    location: str = "server",
+    provenance: str = "resolved"
+) -> np.ndarray:
+    session_path = _eid2path(eid, one, location)
+    dataset = 'mpciROIs.mlapdv.npy' if provenance == 'resolved' else 'mpciROIs.mlapdv_estimate.npy'
+    match location:
+        case 'server':
+            path = session_path / 'alf' / fov / dataset
+            assert path.exists()
+            mlapdv = np.load(path)
+        case 'local':
+            datasets = one.list_datasets(eid, collection=f'alf/{fov}')
+            if f'alf/{fov}/{dataset}' in datasets:
+                mlapdv = one.load_dataset(eid, dataset, collection=f'alf/{fov}')
+            else:
+                # dataset it not available via one
+                # make a general copy dataset function from the sraps above
+                raise NotImplementedError 
+    return mlapdv
+
+
+    

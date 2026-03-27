@@ -257,6 +257,10 @@ def create_coordinate_system_for_ref(
         coordinate_systems.transform(np.array([0, 0]), "pixel", "um"),
         img_topleft_um,
     )
+    nptest.assert_almost_equal(
+        coordinate_systems.transform(np.array([1, 1]), "image", "um"),
+        img_topleft_um + img_size_px * um_per_px,
+    )
     return coordinate_systems
 
 
