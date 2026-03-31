@@ -168,3 +168,6 @@ cython_debug/
 #  want CI to mimic the installation on user site to ensure that the current
 #  version on PyPI doesn't break anything, then do not submit the pdm.lock file.
 pdm.lock
+
+# own additions
+src/scripts/_*

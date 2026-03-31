@@ -15,6 +15,7 @@ from plane2brain import scanimage
 from plane2brain.coordinate_systems import (
     setup_coordinate_systems_3d,
     create_coordinate_system_for_image,
+    get_image_corners,
 )
 import plane2brain.ibl as ibl
 from plane2brain.suite2p import suite2p_data_loader
@@ -241,11 +242,10 @@ fig, axes = plt.subplots()
 corners = get_image_corners(ref_img_size_px, coordinate_systems_ref, to="um_global")
 
 # transform the um_global corners with the 3d system
-if 1:
-    for k, v in corners.items():
-        corners[k] = coordinate_systems_3d.transform(
-            np.append(v, 0), "imaging_plane", "mlapdv"
-        )[:-1]
+for k, v in corners.items():
+    corners[k] = coordinate_systems_3d.transform(
+        np.append(v, 0), "imaging_plane", "mlapdv"
+    )[:-1]
 
 image_kwargs = dict(
     extent=plotters.extent_from_corners(corners),
@@ -278,6 +278,8 @@ brain_surface_points_um = coordinate_systems_ref.transform(
 # the xaxis is the second image dimension
 # BUT
 # the reference points are not stored in i,j as in image dimensions
+# they are stored in screen coordinates as seen here
+# https://www3.ntu.edu.sg/home/ehchua/programming/opengl/images/Graphics3D_DisplayCoord.png
 for p in brain_surface_points_um:
     p_ = coordinate_systems_3d.transform(np.append(p, 0), "imaging_plane", "mlapdv")[
         :-1
@@ -288,6 +290,8 @@ for p in brain_surface_points_um:
 # %% proof: why do we need to swap the axes of the surface points
 # they should be stored in image dim1,2
 # they are not
+# here loading the "old points" (as they were stored in the metadata)
+# to be in perfect accordance with the ground truth example by samuel
 brain_surface_points = ibl.ibl_load_brain_surface_points(eid, one, location=LOCATION)
 brain_surface_points = {"points": ref_img_meta["points"]}
 brain_surface_points_rel = np.array(
@@ -302,6 +306,29 @@ axes.matshow(ref_img_stack[5])
 for p in brain_surface_points_px:
     axes.plot(*p[::1], ".", color="w")
 
+# %% back to 3d and verify with the functional imaging FOVs
+
+# plot them in 3d
+axes = plotters.plot_brain_surface_points(atlas.get_surface_points())
+coordinate_systems_3d.plot(axes=axes, color_by="axis", scale=500)
+
+uuids = sorted(list(fov_map.values()))
+coordinate_systems_fovs = scanimage.create_coordinate_systems_from_scanimage_meta(
+    raw_imaging_meta["rawScanImageMeta"],
+    fov_uuids=uuids,
+    dims=dims,
+)
+
+for uuid, coordinate_system in coordinate_systems_fovs.items():
+    fov_meta = scanimage.get_fov_meta(raw_imaging_meta["rawScanImageMeta"], uuid)
+    fov_size_px = scanimage.get_scanfield_size_px(fov_meta, dims=dims)
+
+    corners = get_image_corners(fov_size_px, coordinate_system, to="um_global")
+    # the corners are expressed in the um global space and need to be
+    # transformed into the mlapdv space first
+    _corners = np.array([np.append(corners[e], 0) for e in edges])
+    _corners = coordinate_systems_3d.transform(_corners, "imaging_plane", "mlapdv")
+    axes.plot(*_corners.T, lw=1, color="k", zorder=10)
 
 # %%
 """

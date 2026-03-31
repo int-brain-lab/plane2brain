@@ -224,46 +224,6 @@ def setup_coordinate_systems_3d(
     return cs3d
 
 
-# def create_coordinate_system_for_ref(
-#     img_size_px: np.ndarray,
-#     um_per_px: np.ndarray,  # pixel resolution
-#     img_topleft_um: np.ndarray,
-# ) -> LinkedCoordinateSystems:
-#     # this function is necessary because
-#     # we don't have the coordinates of the reference image in the scanimage reference space
-#     coordinate_systems = LinkedCoordinateSystems(
-#         dict(
-#             um=CoordinateSystem(basis=np.identity(2), origin=np.zeros(2)),
-#             pixel=CoordinateSystem(basis=np.diag(um_per_px), origin=img_topleft_um),
-#             image=CoordinateSystem(
-#                 basis=np.diag(img_size_px * um_per_px), origin=img_topleft_um
-#             ),
-#         )
-#     )
-#     # some verifications
-#     nptest.assert_almost_equal(
-#         coordinate_systems.transform(np.zeros(2), "image", "pixel"),
-#         np.zeros(2),
-#     )
-#     nptest.assert_almost_equal(
-#         coordinate_systems.transform(np.ones(2), "image", "pixel"),
-#         img_size_px,
-#     )
-#     nptest.assert_almost_equal(
-#         coordinate_systems.transform(img_size_px, "pixel", "image"),
-#         np.ones(2),
-#     )
-#     nptest.assert_almost_equal(
-#         coordinate_systems.transform(np.array([0, 0]), "pixel", "um"),
-#         img_topleft_um,
-#     )
-#     nptest.assert_almost_equal(
-#         coordinate_systems.transform(np.array([1, 1]), "image", "um"),
-#         img_topleft_um + img_size_px * um_per_px,
-#     )
-#     return coordinate_systems
-
-
 def create_coordinate_system_for_image(
     img_size_px: np.ndarray,  # in pixel
     um_per_px: np.ndarray,  # pixel size in um
@@ -360,19 +320,17 @@ def create_coordinate_system_for_image(
     return coordinate_systems
 
 
-# def get_image_corners(img_size_px, coordinate_systems, to="um_global"):
-#     #
-#     img_size_px = np.array(img_size_px)  # cast just in case
-#     #
-#     corners = dict(
-#         topleft=[0, 0],
-#         topright=[0, img_size_px[1]],
-#         bottomleft=[img_size_px[0], 0],
-#         bottomright=[img_size_px[0], img_size_px[1]],
-#         center=img_size_px / 2,
-#     )
-#     #
-#     return {
-#         name: coordinate_systems.transform(np.array(corner), "pixel", to)
-#         for name, corner in corners.items()
-#     }
+def get_image_corners(img_size_px, coordinate_systems, to="um_global"):
+    # TODO DOCME
+    img_size_px = np.array(img_size_px)  # cast just in case
+    corners = dict(
+        topleft=[0, 0],
+        topright=[0, 1],
+        bottomleft=[1, 0],
+        bottomright=[1, 1],
+        center=img_size_px / 2,
+    )
+    return {
+        name: coordinate_systems.transform(np.array(corner), "image", to)
+        for name, corner in corners.items()
+    }
