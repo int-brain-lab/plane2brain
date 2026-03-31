@@ -325,17 +325,10 @@ def infer_ref_stack_virtual_corner(
     bottomright_corners = []
 
     for scanimage_fov_meta in stripes:
+        # get size and center for each fov
         fov_size_ref, fov_center_ref = scanimage.get_scanfield_size_ref(
             scanimage_fov_meta, dims=dims
         )
-        # the center and size are expressed in the scanfield coordinate system
-
-        # the affine transformation to convert scanfield coordinates to reference space
-        # T_a = np.array(scanimage_fov_meta["scanfields"]["affine"])
-
-        # the affine transform to convert pixel coordinates to reference space
-        # T_p = np.array(scanimage_fov_meta["scanfields"]["pixelToRefTransform"])
-
         # transform to reference coordinate frame
         fov_topleft_ref = fov_center_ref - fov_size_ref / 2
         topleft_corners.append(fov_topleft_ref)

@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import numpy.testing as nptest
@@ -20,7 +20,7 @@ def _get_fov_uuids(scanimage_meta: dict[str, Any]) -> List[str]:
 def get_scanfield_size_ref(
     scanimage_fov_meta: dict[str, Any],
     dims: Sequence[str] = ("X", "Y"),
-) -> Sequence[np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray]:
     """Read scanfield size and center from ScanImage FOV metadata.
 
     Args:
@@ -73,7 +73,7 @@ def get_resolution_from_scanimage_meta(
 def get_fov_meta(
     scanimage_meta: dict[str, Any],
     fov_uuid: str,
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
     """Return the metadata block corresponding to the specified FOV UUID."""
     (scanimage_fov_meta,) = [
         meta

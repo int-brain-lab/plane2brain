@@ -241,23 +241,6 @@ def coordinate_system_from_normal(
     return CoordinateSystem(basis=basis, origin=p)
 
 
-# def coordinate_system_from_normal_rot(p, n, name="imaging_plane"):
-#     yaw, pitch, roll = get_vector_angles(n)
-#     r1 = affine.rotation_matrix_x(pitch)
-#     r2 = affine.rotation_matrix_y(-roll)
-#     # TODO for the future, if the scanfield is rotated, this could be integrated here
-#     # r3 = affine.rotation_matrix_z(yaw)
-
-#     # R = r1 @ r2
-#     R = r2 @ r1  # ZYX order
-
-#     # for the new coordinate system
-#     basis = np.identity(3)
-#     basis = affine.apply_transform(basis, R)
-
-#     return (CoordinateSystem(basis=basis, origin=p, name=name),)
-
-
 def setup_coordinate_systems_3d(
     center_mlapdv: np.ndarray,
     brain_normal: np.ndarray,
@@ -352,6 +335,8 @@ def create_coordinate_system_for_image(
             ),
         )
     )
+    # TODO turn these into tests? Discuss
+    # many are redundant as well
     if verify:
         img_size_ref = img_size_px * ref_per_px
         img_bottomright_ref = img_topleft_ref + img_size_ref
