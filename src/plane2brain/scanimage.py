@@ -16,11 +16,38 @@ def _get_fov_uuids(scanimage_meta: dict) -> list:
     return [meta["roiUuid"] for meta in scanimage_fov_metas]
 
 
-def get_resolution_from_scanimage_meta(scanimage_meta: dict) -> np.ndarray:
+def get_scanfield_size_ref(
+    scanimage_fov_meta: dict,
+    dims=["X", "Y"],
+):
+    fov_size_ref = np.array(scanimage_fov_meta["scanfields"]["sizeXY"])
+    fov_center_ref = np.array(scanimage_fov_meta["scanfields"]["centerXY"])
+    if dims == ["Y", "X"]:
+        fov_size_ref = fov_size_ref[::-1]
+        fov_center_ref = fov_center_ref[::-1]
+
+    return fov_size_ref, fov_center_ref
+
+
+def get_scanfield_size_px(
+    scanimage_fov_meta: dict,
+    dims=["X", "Y"],
+):
+    fov_size_px = np.array(scanimage_fov_meta["scanfields"]["pixelResolutionXY"])
+    if dims == ["Y", "X"]:
+        fov_size_px = fov_size_px[::-1]
+
+    return fov_size_px
+
+
+def get_resolution_from_scanimage_meta(
+    scanimage_meta: dict,
+    dims=["X", "Y"],
+) -> np.ndarray:
     # X is the line scan (resonant)
     # are the individual lines, e.g. 512 pixels per line and 512 lines
     px_per_um = np.zeros(2)
-    for i, d in enumerate(["X", "Y"]):
+    for i, d in enumerate(dims):
         res = scanimage_meta[f"{d}Resolution"]
         match scanimage_meta["ResolutionUnit"].casefold():
             case "centimeter":
@@ -46,40 +73,54 @@ def get_fov_meta(
 def create_coordinate_systems_from_scanimage_meta(
     scanimage_meta: dict,
     fov_uuids: Optional[List[str]] = None,
+    dims: List = ["X", "Y"],
 ) -> Dict[str, LinkedCoordinateSystems]:
     # all FOVs or subselection
     if fov_uuids is None:
         fov_uuids = _get_fov_uuids(scanimage_meta)
 
     # pixel resolution from metadata
-    um_per_px = get_resolution_from_scanimage_meta(scanimage_meta)
+    um_per_px = get_resolution_from_scanimage_meta(scanimage_meta, dims=dims)
     coordinate_systems = {}
 
     for fov_uuid in fov_uuids:
         scanimage_fov_meta = get_fov_meta(scanimage_meta, fov_uuid)
-        # misleading variable naming by scanimage but here too X is the line and Y is the line number
-        fov_size_px = np.array(scanimage_fov_meta["scanfields"]["pixelResolutionXY"])
+        # misleading variable naming by scanimage but here too X is the line = resonant scanner, and Y is the line number
+        # this, combined with the fact that on the reference image, the strips are extended vertically
+        # means: XY is AP, ML
+        # fov_size_px = np.array(scanimage_fov_meta["scanfields"]["pixelResolutionXY"])
+        fov_size_px = get_scanfield_size_px(scanimage_fov_meta, dims=dims)
         fov_size_um = fov_size_px * um_per_px
 
         # the size of the scanfield is stored in the metadata in
         # "sizeXY: [width, height] size of the scanfield in optical degrees in the coordinate system in which it is defined"
         # (taken from the doc)
-        # seems like this is ALREADY stored in the "units" of the reference space
-        # for proof:
-        # (T_p @ np.append(fov_size_px, 1))[:-1] - (T_p @ np.append(np.zeros(2), 1))[:-1]
+        # unclear if this is correct (reference space is not equal to optical degrees)
+        # it rather seems it's in reference space
+        # see below for proof at (*)
 
-        fov_size_ref = np.array(scanimage_fov_meta["scanfields"]["sizeXY"])
         # the center and size are expressed in the scanfield coordinate system
-        fov_center_ref = np.array(scanimage_fov_meta["scanfields"]["centerXY"])
-
-        # the affine transformation to convert scanfield coordinates to reference space
-        # T_a = np.array(scanimage_fov_meta["scanfields"]["affine"])
-
-        # the affine transform to convert pixel coordinates to reference space
-        # T_p = np.array(scanimage_fov_meta["scanfields"]["pixelToRefTransform"])
+        # fov_size_ref = np.array(scanimage_fov_meta["scanfields"]["sizeXY"])
+        # fov_center_ref = np.array(scanimage_fov_meta["scanfields"]["centerXY"])
+        fov_size_ref, fov_center_ref = get_scanfield_size_ref(
+            scanimage_fov_meta, dims=dims
+        )
 
         # transform to reference coordinate frame
         fov_topleft_ref = fov_center_ref - fov_size_ref / 2
+
+        # (*) to show that sizeXY is in ref space
+        # according to the docs: the affine transform to convert pixel coordinates to reference space
+        T_p = np.array(scanimage_fov_meta["scanfields"]["pixelToRefTransform"])
+
+        # this will actually fail due to imprecision!
+        # np.testing.assert_allclose(
+        #     (T_p @ np.append(np.zeros(2), 1))[:-1], fov_topleft_ref, rtol=1e-3
+        # )  # not very high precision required here
+
+        # (T_p @ np.append(fov_size_px, 1))[:-1] - (T_p @ np.append(np.zeros(2), 1))[:-1]
+        # T_a = np.array(scanimage_fov_meta["scanfields"]["affine"])
+
         fov_bottomright_ref = fov_topleft_ref + fov_size_ref
         nptest.assert_array_almost_equal(
             fov_size_ref, fov_bottomright_ref - fov_topleft_ref
@@ -92,7 +133,7 @@ def create_coordinate_systems_from_scanimage_meta(
         ref_per_um = 1 / um_per_ref
         fov_topleft_um = fov_topleft_ref * um_per_ref
 
-        cs2d = create_coordinate_system_for_image(
+        coordinate_system = create_coordinate_system_for_image(
             fov_size_px,
             um_per_px,
             ref_per_px,
@@ -101,20 +142,22 @@ def create_coordinate_systems_from_scanimage_meta(
 
         # the image size assertion
         nptest.assert_array_almost_equal(
-            cs2d.transform(fov_topleft_ref, "ref", "pixel"), np.zeros(2)
+            coordinate_system.transform(fov_topleft_ref, "ref", "pixel"),
+            np.zeros(2),
         )
         nptest.assert_array_almost_equal(
-            cs2d.transform(fov_bottomright_ref, "ref", "pixel"), fov_size_px
+            coordinate_system.transform(fov_bottomright_ref, "ref", "pixel"),
+            fov_size_px,
         )
         nptest.assert_array_almost_equal(
-            cs2d.transform(np.zeros(2), "pixel", "ref"), fov_topleft_ref
+            coordinate_system.transform(np.zeros(2), "pixel", "ref"), fov_topleft_ref
         )
         nptest.assert_array_almost_equal(
-            cs2d.transform(fov_bottomright_ref, "ref", "um_global")
-            - cs2d.transform(fov_topleft_ref, "ref", "um_global"),
+            coordinate_system.transform(fov_bottomright_ref, "ref", "um_global")
+            - coordinate_system.transform(fov_topleft_ref, "ref", "um_global"),
             fov_size_um,
         )
-        coordinate_systems[fov_uuid] = cs2d
+        coordinate_systems[fov_uuid] = coordinate_system
 
     return coordinate_systems
 

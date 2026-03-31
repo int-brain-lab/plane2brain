@@ -1,11 +1,12 @@
 from pathlib import Path
-from typing import Optional, Tuple, Dict
+from typing import Optional, Tuple, Dict, List
 import zipfile
 import tifffile
 import json
 import numpy as np
 import subprocess
 
+from plane2brain import scanimage
 from one.api import ONE
 
 BASE_FOLDER = Path("/mnt/s0/Data/Subjects")
@@ -282,29 +283,69 @@ def ibl_load_brain_surface_points(
     # brain_surface_points = ref_img_meta["points"]
     # return brain_surface_points
 
+
 def ibl_load_roi_mlapdv(
     eid: str,
     one: ONE,
-    fov: str = 'FOV_00',
+    fov: str = "FOV_00",
     location: str = "server",
-    provenance: str = "resolved"
+    provenance: str = "resolved",
 ) -> np.ndarray:
     session_path = _eid2path(eid, one, location)
-    dataset = 'mpciROIs.mlapdv.npy' if provenance == 'resolved' else 'mpciROIs.mlapdv_estimate.npy'
+    dataset = (
+        "mpciROIs.mlapdv.npy"
+        if provenance == "resolved"
+        else "mpciROIs.mlapdv_estimate.npy"
+    )
     match location:
-        case 'server':
-            path = session_path / 'alf' / fov / dataset
+        case "server":
+            path = session_path / "alf" / fov / dataset
             assert path.exists()
             mlapdv = np.load(path)
-        case 'local':
-            datasets = one.list_datasets(eid, collection=f'alf/{fov}')
-            if f'alf/{fov}/{dataset}' in datasets:
-                mlapdv = one.load_dataset(eid, dataset, collection=f'alf/{fov}')
+        case "local":
+            datasets = one.list_datasets(eid, collection=f"alf/{fov}")
+            if f"alf/{fov}/{dataset}" in datasets:
+                mlapdv = one.load_dataset(eid, dataset, collection=f"alf/{fov}")
             else:
                 # dataset it not available via one
                 # make a general copy dataset function from the sraps above
-                raise NotImplementedError 
+                raise NotImplementedError
     return mlapdv
 
 
-    
+def infer_ref_stack_virtual_corner(
+    ref_img_scanimage_meta: dict,
+    ref_img_size_px: np.ndarray,  # in 2d (X,Y)
+    dims: List = ["X", "Y"],
+):
+    # get the corner of the reference stack in ref space
+    # TODO refactor me
+    stripes = ref_img_scanimage_meta["Artist"]["RoiGroups"]["imagingRoiGroup"]["rois"]
+
+    topleft_corners = []
+    bottomright_corners = []
+
+    for scanimage_fov_meta in stripes:
+        fov_size_ref, fov_center_ref = scanimage.get_scanfield_size_ref(
+            scanimage_fov_meta, dims=dims
+        )
+        # the center and size are expressed in the scanfield coordinate system
+
+        # the affine transformation to convert scanfield coordinates to reference space
+        # T_a = np.array(scanimage_fov_meta["scanfields"]["affine"])
+
+        # the affine transform to convert pixel coordinates to reference space
+        # T_p = np.array(scanimage_fov_meta["scanfields"]["pixelToRefTransform"])
+
+        # transform to reference coordinate frame
+        fov_topleft_ref = fov_center_ref - fov_size_ref / 2
+        topleft_corners.append(fov_topleft_ref)
+
+        fov_bottomright_ref = fov_center_ref + fov_size_ref / 2
+        bottomright_corners.append(fov_bottomright_ref)
+
+    ref_img_topleft_ref = np.min(topleft_corners, axis=0)
+    ref_img_bottomright_ref = np.max(bottomright_corners, axis=0)
+    ref_per_px = (ref_img_bottomright_ref - ref_img_topleft_ref) / ref_img_size_px
+
+    return ref_img_topleft_ref, ref_per_px

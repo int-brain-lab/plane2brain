@@ -255,7 +255,10 @@ def get_brain_surface_normal(
         [point["coords"] for point in reference_brain_surface_points["points"]]
     )
     brain_surface_points_rel_um = coordinate_systems_ref.transform(
-        brain_surface_points_rel, "image", "um"
+        # brain_surface_points_rel, "image", "um"
+        brain_surface_points_rel,
+        "image",
+        "um_global",
     )  # NOTE this is um_global
     # these are the 3 points on the brain surface, relative, in um
     brain_surface_points_rel_um_3d = np.concatenate(
