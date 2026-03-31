@@ -1,25 +1,12 @@
 # %%
-# %matplotlib qt5
-import matplotlib as mpl
-
-mpl.rcParams["figure.dpi"] = 300
-
-# %%
-from pathlib import Path
 import numpy as np
-
-from plane2brain import plotters, projections
-from plane2brain.atlas import ProjectionAtlas
-from plane2brain import scanimage
-
+from plane2brain import plotters, projections, scanimage, suite2p, ibl
 from plane2brain.coordinate_systems import (
     setup_coordinate_systems_3d,
     create_coordinate_system_for_image,
     get_image_corners,
 )
-import plane2brain.ibl as ibl
-from plane2brain.suite2p import suite2p_data_loader
-
+from plane2brain.atlas import ProjectionAtlas
 from one.api import ONE
 import matplotlib.pyplot as plt
 
@@ -41,26 +28,21 @@ PLOT = True
  
 """
 
-"""
-load the suite2p data
-"""
 one = ONE()
 # eid = one.ref2eid(dict(subject="SP058", date="2024-07-25", sequence="001"))
 eid = one.ref2eid(dict(subject="SP058", date="2024-08-01", sequence="001"))
 
 # load the reference image metadata
-ref_img_meta = ibl.ibl_load_reference_stack_metadata(eid, one, location=LOCATION)
-ref_point_mlap, ref_point_ref = ibl.get_reference_points_from_meta(
+ref_img_meta = ibl.load_reference_stack_metadata(eid, one, location=LOCATION)
+ref_point_mlap, ref_point_ref = ibl.load_reference_points_from_meta(
     ref_img_meta, use_resolved=True
 )  # the craniotomy center, both in ml,ap (histology resolved) and in
 # the reference space of scanimage (galvos)
 
 # load the suite2p data
-raw_imaging_meta, stat_paths, fov_map = ibl.ibl_load_fov_data(
-    eid, one, location=LOCATION
-)
+raw_imaging_meta, stat_paths, fov_map = ibl.load_fov_data(eid, one, location=LOCATION)
 fov_names = sorted(list(fov_map.keys()))
-coords_px = suite2p_data_loader(stat_paths, fov_map)  # refactor: rename coords_px
+coords_px = suite2p.data_loader(stat_paths, fov_map)  # refactor: rename coords_px
 
 # this is defined
 scanner_orientation = dict(rotation=0.0, invert_axis=[True, True, False])
@@ -84,8 +66,8 @@ atlas = ProjectionAtlas(res_um=50)
 
 # load the actual reference image stack
 # which is stored on disk in: dv,ml,ap (!)
-ref_img_stack = ibl.ibl_load_reference_stack(eid, one, location=LOCATION)
-ref_img_meta = ibl.ibl_load_reference_stack_metadata(eid, one, location=LOCATION)
+ref_img_stack = ibl.load_reference_stack(eid, one, location=LOCATION)
+ref_img_meta = ibl.load_reference_stack_metadata(eid, one, location=LOCATION)
 ref_img_size_px = np.array(ref_img_stack[0].shape)  # ml,ap
 
 # scanimage metadata is by default stored as XY
@@ -240,7 +222,7 @@ axes.set_xlabel("AP")
 axes.set_ylabel("ML")
 
 # plot the reference points
-brain_surface_points = ibl.ibl_load_brain_surface_points(eid, one, location=LOCATION)
+brain_surface_points = ibl.load_brain_surface_points(eid, one, location=LOCATION)
 # CAREFUL - we are here swapping the axis, see for explanation below
 brain_surface_points_rel = np.array(
     [point["coords"][::-1] for point in brain_surface_points["points"]]
@@ -265,7 +247,7 @@ for p in brain_surface_points_um:
 # %% proof: brain surface points are stored in screen coordinates
 
 # the new way of loading the points
-brain_surface_points = ibl.ibl_load_brain_surface_points(eid, one, location=LOCATION)
+brain_surface_points = ibl.load_brain_surface_points(eid, one, location=LOCATION)
 
 # here loading the "old points" (as they were stored in the metadata)
 # to be in perfect accordance with the ground truth example by samuel
@@ -323,7 +305,7 @@ for uuid, coordinate_system in coordinate_systems_fovs.items():
 
 # %% adjusting for the fact that this is not the case: getting the optical axis
 # load the brain surface points and get the normal
-brain_surface_points = ibl.ibl_load_brain_surface_points(eid, one, location=LOCATION)
+brain_surface_points = ibl.load_brain_surface_points(eid, one, location=LOCATION)
 
 # this normal is expressed in the coordinate system of the reference stack
 p_surface, n_surface, dv_avg = projections.get_brain_surface_normal(
@@ -457,6 +439,7 @@ for name, uuid in fov_map.items():
    ###    ####  ######
 """
 
+# already interleaved above
 
 # %%
 """

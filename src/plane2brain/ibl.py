@@ -20,7 +20,7 @@ def _eid2path(eid: str, one: ONE, location="server"):
     return session_path
 
 
-def ibl_load_fov_data(
+def load_fov_data(
     eid: str,
     one: ONE,
     raw_imaging_collection: Optional[str] = None,
@@ -85,7 +85,7 @@ def ibl_load_fov_data(
     return raw_imaging_meta, stat_paths, fov_map
 
 
-def ibl_get_reference_stack_path(
+def get_reference_stack_path(
     eid: str,
     one: ONE,
     raw_imaging_collection: Optional[str] = None,
@@ -113,7 +113,7 @@ def ibl_get_reference_stack_path(
     return filepath
 
 
-def ibl_load_reference_stack(
+def load_reference_stack(
     eid: str,
     one: ONE,
     raw_imaging_collection: Optional[str] = None,
@@ -121,11 +121,11 @@ def ibl_load_reference_stack(
 ) -> np.ndarray:
     if raw_imaging_collection is None:
         raw_imaging_collection = infer_imaging_collection(eid, one, location=location)
-    filepath = ibl_get_reference_stack_path(eid, one, location=location)
+    filepath = get_reference_stack_path(eid, one, location=location)
     return tifffile.imread(filepath)  # (dv, ml, ap)
 
 
-def ibl_load_reference_stack_metadata(
+def load_reference_stack_metadata(
     eid: str,
     one: ONE,
     raw_imaging_collection: Optional[str] = None,
@@ -157,7 +157,7 @@ def ibl_load_reference_stack_metadata(
     return ref_img_meta
 
 
-def get_reference_points_from_meta(
+def load_reference_points_from_meta(
     ref_img_meta: dict,
     use_resolved: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray]:
@@ -184,7 +184,6 @@ def get_reference_points_from_meta(
 
 def infer_imaging_collection(eid: str, one: ONE, location="server") -> str:
     # infer the imaging collection
-    # TODO add non server usage
     session_path = _eid2path(eid=eid, one=one, location=location)
     match location:
         case "server":
@@ -213,7 +212,7 @@ def infer_imaging_collection(eid: str, one: ONE, location="server") -> str:
             return collections[0].split("/")[0]
 
 
-def ibl_load_brain_surface_points(
+def load_brain_surface_points(
     eid: str,
     one: ONE,
     raw_imaging_collection: Optional[Path] = None,
@@ -278,13 +277,13 @@ def ibl_load_brain_surface_points(
 
     return brain_surface_points
     # the surface points are written into the metadata
-    # ref_img_meta = ibl_load_reference_stack_metadata(eid, one)
+    # ref_img_meta = load_reference_stack_metadata(eid, one)
     # assert "points" in ref_img_meta
     # brain_surface_points = ref_img_meta["points"]
     # return brain_surface_points
 
 
-def ibl_load_roi_mlapdv(
+def load_roi_mlapdv(
     eid: str,
     one: ONE,
     fov: str = "FOV_00",

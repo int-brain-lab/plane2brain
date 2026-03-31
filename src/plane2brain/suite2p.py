@@ -6,7 +6,7 @@ import numpy as np
 
 
 # this is "kind of" ibl specific
-def suite2p_data_loader(
+def data_loader(
     stat_paths: Dict[str, Path],
     fov_map: dict,
 ) -> Dict[str, np.ndarray]:
