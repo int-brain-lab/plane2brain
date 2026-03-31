@@ -7,6 +7,7 @@ from plane2brain.atlas import ProjectionAtlas
 from plane2brain.scanimage import (
     extract_fov_depths_from_scanimage_meta,
     create_coordinate_systems_from_scanimage_meta,
+    get_fov_meta,
 )
 from plane2brain.coordinate_systems import (
     setup_coordinate_systems_3d,
@@ -19,8 +20,8 @@ import matplotlib.pyplot as plt
 
 
 # %% whiterussian / local server base folder
-BASE_FOLDER = Path("/mnt/s0/Data/Subjects")
-LOCATION = "server"
+# BASE_FOLDER = Path("/mnt/s0/Data/Subjects")
+LOCATION = "local"
 SAVE_OUTPUT = False
 
 # %%
@@ -59,6 +60,7 @@ coords_px = suite2p_data_loader(stat_paths, fov_map)  # rename coords_px
 
 # this is unfortunately defined
 scanner_orientation = dict(rotation=3 / 2 * np.pi, invert_axis=[True, False, False])
+# scanner_orientation = dict(rotation=0., invert_axis=[True, True, False])
 
 # this is the atlas to project onto
 atlas = ProjectionAtlas(res_um=50)
@@ -77,6 +79,12 @@ atlas = ProjectionAtlas(res_um=50)
 # %% setting up the coordinate systems for the imaged fovs
 fov_uuids = sorted(list(fov_map.values()))
 
+# the 2d coordinate systems, by fov name
+coordinate_systems_2d = create_coordinate_systems_from_scanimage_meta(
+    raw_imaging_meta["rawScanImageMeta"],
+    fov_uuids=fov_uuids,
+)
+
 # this gets the dv component for the ref point, as well as the brain normal at that
 # location
 ref_point_mlapdv, brain_normal_at_ref = atlas.get_plane_at_point_mlap(
@@ -93,19 +101,13 @@ coordinate_systems_3d = setup_coordinate_systems_3d(
     invert_dims=scanner_orientation["invert_axis"],
 )
 
-# %% the 2d coordinate systems, by fov name
-coordinate_systems_2d = create_coordinate_systems_from_scanimage_meta(
-    raw_imaging_meta["rawScanImageMeta"],
-    fov_uuids=fov_uuids,
-)
-
 coords = projections.project_scanimage_fovs(
     coords_px,  # the pixel coordinates as loaded from suite2p
     coordinate_systems_2d,
     coordinate_systems_3d,
     atlas=atlas,
     projection_vector=brain_normal_at_ref,
-    # ds=10,
+    ds=10,
 )
 
 # %% projecting down from surface
@@ -147,6 +149,8 @@ for name, uuid in fov_map.items():
 
 
 # %% some diagnostic plotting
+from plane2brain.coordinate_systems import get_image_corners
+
 fig, axes = plt.subplots()
 fov_uuids = sorted(list(coords.keys()))
 for name, uuid in fov_map.items():
@@ -156,6 +160,11 @@ for name, uuid in fov_map.items():
     coords_um = coordinate_systems_2d[uuid].transform(_coords, "pixel", "um_global")
     # axes.plot(*coords_um.T, ".")
     axes.scatter(*coords_um.T, c=coords[uuid]["atlas_rgba"] / 255)
+    img_size_px = (512, 512)  # TODO infer me
+    corners = get_image_corners(
+        img_size_px, coordinate_systems_2d[uuid], to="um_global"
+    )
+    plotters.plot_fov_outline_from_corners(corners, axes=axes)
 
 axes.set_aspect("equal")
 kwargs = dict(linestyle=":", lw=1, alpha=1, color="k")
@@ -165,7 +174,10 @@ circle = plt.Circle((0, 0), 3000, fill=False, color="k")
 axes.add_patch(circle)
 axes.set_xlabel("X")
 axes.set_ylabel("Y")
-axes.invert_yaxis()  # because scanimage scanner coordinates follow image coordinate convention
+
+# while this looks wrong - keep in mind that this is in the ref space transformed to global um
+# so in order to make this align with what you would get by a .matshow, the scanner orientation
+# has to be taken into account
 
 # %% some 3d stuff
 axes = plotters.plot_brain_surface_points(atlas.get_surface_points())
@@ -177,6 +189,27 @@ for name, uuid in fov_map.items():
         color=coords[uuid]["atlas_rgba"] / 255,
     )
 coordinate_systems_3d.plot(axes=axes, color_by="axis", scale=500)
+
+# in this 3d space, plot the outlines of the individual FOVs
+from plane2brain.coordinate_systems import get_image_corners
+
+for fov, uuid in fov_map.items():
+    img_size_px = get_fov_meta(raw_imaging_meta["rawScanImageMeta"], uuid)[
+        "scanfields"
+    ]["pixelResolutionXY"]
+    corners = get_image_corners(img_size_px, coordinate_systems_2d[uuid], to="um_global")
+    edges = ["topleft", "topright", "bottomright", "bottomleft", "topleft"]
+    _corners = np.array([np.append(corners[e], 0) for e in edges])
+    _corners = coordinate_systems_3d.transform(_corners, "imaging_plane", "mlapdv")
+    axes.plot(*_corners.T, lw=1, color="k")
+
+axes.set_aspect("equal")
+
+# plot stevens result on top
+if 0:
+    for fov_name, uuid in fov_map.items():
+        mlapdv = ibl.ibl_load_roi_mlapdv(eid, one, fov_name, location=LOCATION)
+        plotters.plot_points(mlapdv, axes=axes,s=2,color='g')
 
 # %%
 """
@@ -190,9 +223,9 @@ coordinate_systems_3d.plot(axes=axes, color_by="axis", scale=500)
   ######  ##     ##    ###    ########     #######   #######     ##    ##         #######     ##    
  
 """
-if not SAVE_OUTPUT:
+if SAVE_OUTPUT:
     for name, uuid in fov_map.items():
-        session_folder = BASE_FOLDER / one.eid2path(eid).session_path_short()
+        session_folder = ibl._eid2path(eid, one, location=LOCATION)
         coords_mlapdv = coords[uuid]["mlapdv"]
         # saving the updated coordinates
         np.save(
