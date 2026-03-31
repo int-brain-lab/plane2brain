@@ -119,33 +119,6 @@ coordinate_systems_ref = create_coordinate_system_for_image(
 
 
 # %% verify
-# TODO this function is to be moved
-def get_image_corners(img_size_px, coordinate_systems, to="um_global"):
-    # img_size_px is in XY (scanimageXY)
-    # X = resonant = AP
-    img_size_px = np.array(img_size_px)  # cast just in case
-
-    # when image is plotted
-    # vertical axis is ML
-    # horizontal is AP
-
-    # image is of shape i,j
-    # in a matshow, i corresponds to vertical = ML
-    # in a plot, the first argument corresponds to xaxis = horizontal
-
-    corners = dict(
-        topleft=[0, 0],
-        topright=[0, 1],  #
-        bottomleft=[1, 0],
-        bottomright=[1, 1],
-        center=img_size_px / 2,
-    )
-    return {
-        name: coordinate_systems.transform(np.array(corner), "image", to)
-        for name, corner in corners.items()
-    }
-
-
 corners = get_image_corners(ref_img_size_px, coordinate_systems_ref, to="um_global")
 extent = plotters.extent_from_corners(corners)
 fig, axes = plt.subplots()
@@ -280,6 +253,8 @@ brain_surface_points_um = coordinate_systems_ref.transform(
 # the reference points are not stored in i,j as in image dimensions
 # they are stored in screen coordinates as seen here
 # https://www3.ntu.edu.sg/home/ehchua/programming/opengl/images/Graphics3D_DisplayCoord.png
+# this means they should be swapped before the transform, as they are in the reader above
+
 for p in brain_surface_points_um:
     p_ = coordinate_systems_3d.transform(np.append(p, 0), "imaging_plane", "mlapdv")[
         :-1
@@ -402,6 +377,7 @@ fov_uuids = sorted(list(fov_map.values()))
 coordinate_systems_2d = scanimage.create_coordinate_systems_from_scanimage_meta(
     raw_imaging_meta["rawScanImageMeta"],
     fov_uuids=fov_uuids,
+    dims=dims,
 )
 
 coords = projections.project_scanimage_fovs(
@@ -587,27 +563,27 @@ _corners = np.array([np.append(corners[e], 0) for e in edges])
 _corners = coordinate_systems_3d.transform(_corners, "imaging_plane", "mlapdv")
 axes.plot(*_corners.T, lw=1, color="k", zorder=10)
 axes.plot(*_corners[0], ".", lw=1, color="r")
-axes.plot(*_corners[1], ".", lw=1, color="g")  # this is a problem!
-axes.plot(*_corners[3], ".", lw=1, color="b")  # this is a problem!
+axes.plot(*_corners[1], ".", lw=1, color="g")
+axes.plot(*_corners[3], ".", lw=1, color="b")
 
 axes.set_aspect("equal")
 
 # %% now, verify the tilt
 axes = plotters.plot_brain_surface_points(atlas.get_surface_points())
-for name, uuid in fov_map.items():
-    plotters.plot_points(
-        coords[uuid]["on_surface"],
-        axes=axes,
-        s=2,
-        color=coords[uuid]["atlas_rgba"] / 255,
-    )
+# for name, uuid in fov_map.items():
+#     plotters.plot_points(
+#         coords[uuid]["on_surface"],
+#         axes=axes,
+#         s=2,
+#         color=coords[uuid]["atlas_rgba"] / 255,
+#     )
 
-    plotters.plot_points(
-        coords[uuid]["reprojected"],
-        axes=axes,
-        s=2,
-        color="k",
-    )
+#     plotters.plot_points(
+#         coords[uuid]["reprojected"],
+#         axes=axes,
+#         s=2,
+#         color="k",
+#     )
 coordinate_systems_3d.plot(axes=axes, color_by="system", scale=500)
 coordinate_systems_3d_adjusted.plot(axes=axes, color_by="axis", scale=500)
 

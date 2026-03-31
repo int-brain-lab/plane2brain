@@ -235,7 +235,7 @@ def get_brain_surface_normal(
     and it's normal. Additionally, returns the average depth of the three points that is
     later used to adjust the apparent depth of a cell."""
     # TODO decouple here:
-    # IBL specific
+    # IBL specific - this should be the loader, that also inverts the dimensions of the points
     # and scanimage specific
 
     # DOCME user selected
@@ -244,25 +244,28 @@ def get_brain_surface_normal(
     ]
     # the position of the voice coil (for z offset calculation)
     # fastz_pos = ref_img_meta["scanImageParams"]['hFastZ']['position']
-    # inversion of the sign: positive is up
-    stack_dv = (
-        -1 * np.array(ref_img_meta["scanImageParams"]["hStackManager"]["zs"])[stack_ixs]
-    )
-    dv_avg = np.average(
-        stack_dv
-    )  # horizontally average plane between the selected surface points
+    stack_planes_dv = np.array(ref_img_meta["scanImageParams"]["hStackManager"]["zs"])
+    # zero at average surface and negative numbers are inwards == below surface
+    stack_planes_dv = -1 * (stack_planes_dv - np.average(stack_planes_dv[stack_ixs]))
+    ref_points_dv = stack_planes_dv[stack_ixs]
+
+    # horizontally average plane between the selected surface points
+    dv_avg = np.average(ref_points_dv)
+
+    # extract the brain surface points, convert them from the relative
+    # to um. CAREFUL here - they are stored with the swapped dimensions
+    # this should be encapsulated in an ibl specific reader
     brain_surface_points_rel = np.array(
-        [point["coords"] for point in reference_brain_surface_points["points"]]
+        [point["coords"][::-1] for point in reference_brain_surface_points["points"]]
     )
     brain_surface_points_rel_um = coordinate_systems_ref.transform(
-        # brain_surface_points_rel, "image", "um"
         brain_surface_points_rel,
         "image",
         "um_global",
-    )  # NOTE this is um_global
+    )
     # these are the 3 points on the brain surface, relative, in um
     brain_surface_points_rel_um_3d = np.concatenate(
-        [brain_surface_points_rel_um, stack_dv[:, np.newaxis]], axis=1
+        [brain_surface_points_rel_um, ref_points_dv[:, np.newaxis]], axis=1
     )
     p_surface, n_surface = plane_normal_form(brain_surface_points_rel_um_3d)
     # invert if pointing downards
