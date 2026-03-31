@@ -114,8 +114,6 @@ def setup_coordinate_systems_from_scanimage_meta(
         fov_uuids=fov_uuids,
     )
     return coordinate_systems_2d, coordinate_systems_3d
-    # coordinate_systems_fovs = dict(zip(fov_names, coordinate_systems))
-    # axes = plotters.plot_brain_surface_points(brain_surface_points)
 
 
 def project_scanimage_fovs(
@@ -139,7 +137,7 @@ def project_scanimage_fovs(
             "um_global",
         )
         coords_projected[fov_uuid]["pixel"] = _coords_px
-        coords_projected[fov_uuid]["um"] = _coords_um
+        coords_projected[fov_uuid]["um_global"] = _coords_um
 
         # project onto brain atlas
         coords_projected[fov_uuid]["on_surface"] = project_coords_onto_atlas_surface(
@@ -150,67 +148,6 @@ def project_scanimage_fovs(
         )
 
     return coords_projected
-
-
-# TODO this function should be project multi fov or similar
-def project_from_scanimage_meta(
-    coords_px: Dict[str, np.ndarray],  # keys = scanimage fov uuids
-    scanimage_meta: dict,
-    scanner_orientation: dict,
-    common_point_mlap: np.ndarray,
-    atlas: ProjectionAtlas,
-    ds: int = 1,  # downsample factor for debugging
-) -> Tuple[
-    Dict[str, Dict[str, np.ndarray]],
-    Dict[str, LinkedCoordinateSystems],
-    LinkedCoordinateSystems,
-]:
-    # and creating the coordinate system
-    # TODO integrate ref point 0,0 differnces
-    # ref_point_mlap == craniotomy center
-    ref_point_mlapdv, brain_normal_at_ref = atlas.get_plane_at_point_mlap(
-        *common_point_mlap,
-        numba=True,
-    )
-    coordinate_systems_3d = setup_coordinate_systems_3d(
-        ref_point_mlapdv,
-        brain_normal_at_ref,
-        rotate_by=scanner_orientation["rotation"],
-        invert_dims=scanner_orientation["invert_axis"],
-    )
-
-    # the 2d coordinate systems, by fov name
-    fov_uuids = sorted(list(coords_px.keys()))
-    coordinate_systems_2d = create_coordinate_systems_from_scanimage_meta(
-        scanimage_meta,
-        fov_uuids=fov_uuids,
-    )
-    # coordinate_systems_fovs = dict(zip(fov_names, coordinate_systems))
-    # axes = plotters.plot_brain_surface_points(brain_surface_points)
-
-    coords_projected = {}
-    for fov_uuid in fov_uuids:
-        coords_projected[fov_uuid] = {}
-        # get the pixel data
-        _coords_px = coords_px[fov_uuid][::ds]  # downsample factor for debugging
-        # project into global um space
-        _coords_um = coordinate_systems_2d[fov_uuid].transform(
-            _coords_px,
-            "pixel",
-            "um_global",
-        )
-        coords_projected[fov_uuid]["pixel"] = _coords_px
-        coords_projected[fov_uuid]["um"] = _coords_um
-
-        # project onto brain atlas
-        coords_projected[fov_uuid]["on_surface"] = project_coords_onto_atlas_surface(
-            _coords_um,
-            coordinate_systems_3d,
-            atlas,
-            brain_normal_at_ref,
-        )
-
-    return coords_projected, coordinate_systems_2d, coordinate_systems_3d
 
 
 """
@@ -242,11 +179,14 @@ def get_brain_surface_normal(
     stack_ixs = [
         point["stack_idx"] for point in reference_brain_surface_points["points"]
     ]
+
     # the position of the voice coil (for z offset calculation)
+    # is the same for all stack planes, check here:
+    # (could be turned into an assertion)
     # fastz_pos = ref_img_meta["scanImageParams"]['hFastZ']['position']
-    stack_planes_dv = np.array(ref_img_meta["scanImageParams"]["hStackManager"]["zs"])
-    # zero at average surface and negative numbers are inwards == below surface
-    stack_planes_dv = -1 * (stack_planes_dv - np.average(stack_planes_dv[stack_ixs]))
+    stack_planes_dv = -1 * np.array(
+        ref_img_meta["scanImageParams"]["hStackManager"]["zs"]
+    )
     ref_points_dv = stack_planes_dv[stack_ixs]
 
     # horizontally average plane between the selected surface points
@@ -277,7 +217,7 @@ def get_brain_surface_normal(
 
 def correct_coords_for_tilt_2d(
     coords: Dict[str, Dict[str, np.ndarray]],  # uuid -> pixel etc
-    coordinate_systems: Dict[str, LinkedCoordinateSystems],
+    # coordinate_systems: Dict[str, LinkedCoordinateSystems],
     fov_depths: Dict[str, np.float64],
     p_surface: np.ndarray,
     n_surface: np.ndarray,
@@ -298,27 +238,26 @@ def correct_coords_for_tilt_2d(
     """
 
     for uuid in list(coords.keys()):
-        _coords = coords[uuid]["pixel"]
-        coords_um = coordinate_systems[uuid].transform(_coords, "pixel", "um_global")
-
-        # coords_um = ... # 2d array in um_global!
-        # dv_below_surface = np.zeros(coords_um.shape[0])
-        coords_surface = np.zeros((coords_um.shape[0], 3))
+        # getting the global um coordinates for each coordinate
+        coords_um = coords[uuid]["um_global"]
 
         # turning this into 3d coordinates using the fov depth
+        # this is hybrid: ml and ap are in um_global, dv is depth
+        # below surface.
         coords_um_3d = np.concatenate(
             [coords_um, np.ones((coords_um.shape[0], 1)) * fov_depths[uuid]], axis=1
         )
-
+        # This enables us to:
+        # from a given point, go along the brain normal until it intersects
+        # the brain surface as defined by n_surface, p_surface
+        coords_surface = np.zeros((coords_um.shape[0], 3))  # alloc
         for i, _coords in enumerate(coords_um_3d):
-            # depth below plane
-
-            # the ml, ap of these are the corrected values
             coords_surface[i] = intersect_line_plane(
                 _coords, n_surface, p_surface, n_surface
             )
 
-        # true dv is the distance between the point and the plane
+        # then, the refined dv estimate is the distance between the original point
+        # and the intersection point with the plane
         dv_below_surface = np.sqrt(np.sum((coords_um_3d - coords_surface) ** 2, axis=1))
 
         coords[uuid]["um_corrected"] = coords_surface[:, :-1]
