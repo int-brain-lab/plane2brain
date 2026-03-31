@@ -1,44 +1,67 @@
-from typing import Optional, List, Dict
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 from numpy import linalg
 import numpy.testing as nptest
 import matplotlib.pyplot as plt
 import seaborn as sns
+from matplotlib.axes import Axes
 
 from plane2brain.affine import rotation_matrix_z, apply_transform
 from plane2brain.plotters import plot_line
 
 
 class CoordinateSystem:
+    """A linear coordinate system defined by an origin and basis vectors.
+
+    The basis vectors are stored as the columns of `basis` and define the
+    local axes relative to the world frame. Points can be mapped between the
+    local coordinate system and the world coordinate frame.
+    """
+
     def __init__(
         self,
-        basis: np.ndarray = None,
-        origin: np.ndarray = None,
-    ):
+        basis: np.ndarray,
+        origin: np.ndarray,
+    ) -> None:
+        """Initialize a coordinate system.
+
+        Args:
+            basis: Array of shape `(D, D)` where each column is a basis vector.
+            origin: Array of shape `(D,)` representing the origin in world
+                coordinates.
         """
-        A 2d or 3d coordinate system, defined by a set of basis vectors and an origin point.
-        the basis vectors spanning the space in the columns
-        the origin on the coordinate system
-        """
-        # basis is shape (3, 3), columns are vectors
         self.basis = basis
-        # origin is a single point of shape (3,)
         self.origin = origin
         self.dim = basis.shape[0]
 
-    def normalize(self):
+    def normalize(self) -> None:
+        """Normalize each basis vector to unit length."""
         self.basis /= linalg.norm(self.basis, axis=0)[np.newaxis, :]
 
     def inverse_transform(self, points: np.ndarray) -> np.ndarray:
         # from this coordinate system to world frame
         return points @ self.basis.T + self.origin
 
-    def transform(self, points_w):
+    def transform(self, points_w: np.ndarray) -> np.ndarray:
         # from world frame to this coordinate system
         return (points_w - self.origin) @ linalg.pinv(self.basis.T)
 
-    def plot(self, axes=None, scale=1, **kwargs):
+    def plot(
+        self, axes: Optional[Axes] = None, scale: float = 1.0, **kwargs: Any
+    ) -> Axes:
+        """Plot the coordinate axes for this system.
+
+        Args:
+            axes: Optional Matplotlib axes object. If not provided, a new axes
+                object is created.
+            scale: Scale factor for the plotted basis vectors.
+            **kwargs: Passed through to `plot_line`. The `color` keyword is
+                interpreted per-axis if provided.
+
+        Returns:
+            The Matplotlib axes instance containing the plot.
+        """
         if axes is None:
             if self.dim == 2:
                 _, axes = plt.subplots()
@@ -65,6 +88,8 @@ class CoordinateSystem:
 
 
 class LinkedCoordinateSystems:
+    """A named collection of coordinate systems sharing the same dimensionality."""
+
     def __init__(
         self,
         coordinate_systems: Dict[str, CoordinateSystem],
@@ -84,6 +109,16 @@ class LinkedCoordinateSystems:
         name_from: str,
         name_target: str,
     ) -> np.ndarray:
+        """Transform points from one named system to another.
+
+        Args:
+            points: Coordinates in the source system, shape `(..., D)`.
+            name_from: Name of the source coordinate system.
+            name_target: Name of the target coordinate system.
+
+        Returns:
+            Coordinates in the target coordinate system.
+        """
         for name in [name_from, name_target]:
             if name not in self.coordinate_systems.keys():
                 raise ValueError(
@@ -95,7 +130,24 @@ class LinkedCoordinateSystems:
         points_w = self.coordinate_systems[name_from].inverse_transform(points)
         return self.coordinate_systems[name_target].transform(points_w)
 
-    def plot(self, scale=1, axes=None, color_by="system"):
+    def plot(
+        self,
+        scale: float = 1.0,
+        axes: Optional[Axes] = None,
+        color_by: str = "system",
+    ) -> Axes:
+        """Plot all linked coordinate systems on a shared axes.
+
+        Args:
+            scale: Scale factor for each coordinate system's axes.
+            axes: Optional Matplotlib axes object. If not provided, a new axes
+                is created.
+            color_by: If "system", assign each system a distinct color. If
+                "axis", plot using the default axis colors.
+
+        Returns:
+            The Matplotlib axes instance containing the plot.
+        """
         if axes is None:
             if self.dim == 2:
                 _, axes = plt.subplots()
@@ -122,7 +174,15 @@ class LinkedCoordinateSystems:
         axes.legend()
         return axes
 
-    def get(self, name: str):
+    def get(self, name: str) -> CoordinateSystem:
+        """Return a named coordinate system.
+
+        Args:
+            name: The name of the coordinate system to retrieve.
+
+        Returns:
+            The requested CoordinateSystem instance.
+        """
         return self.coordinate_systems[name]
 
     def __repr__(self):
@@ -130,23 +190,26 @@ class LinkedCoordinateSystems:
 
 
 # TODO refactor
-def cs3d_from_normal(
+def coordinate_system_from_normal(
     p: np.ndarray,  # point
     n: np.ndarray,  # normal
     rotate_by: Optional[float] = None,  # around the axis of the normal
-    invert_dims: List[bool] = [False, False, False],
+    invert_dims: Optional[List[bool]] = None,
 ) -> CoordinateSystem:
-    """creates a coordinates system with origin at point p and the upward pointing (DV) axis defined by n.
-    Constraines AP vector to have a 0 ML component, all other direction are inferred.
+    """Create a coordinate system whose DV axis aligns with a given normal.
 
-    This mimics a horizontally aligned mouse, and the objective is tilted in the coronal plane.
+    The generated coordinate system uses `p` as its origin. The DV axis is set
+    to `n`, and the AP axis is constrained to have zero ML component. The ML
+    axis is inferred by the cross product.
 
     Args:
-        p (np.ndarray): point
-        n (np.ndarray): vector
+        p: Origin point of shape `(3,)`.
+        n: Normal vector of shape `(3,)`, representing the DV direction.
+        rotate_by: Optional rotation around the Z axis after basis construction.
+        invert_dims: Optional length-3 boolean list to flip basis axes.
 
     Returns:
-        CoordinateSystem: _description_
+        The imaging-plane coordinate system aligned with the given normal.
     """
 
     ap, dv = n[1], n[2]
@@ -168,6 +231,9 @@ def cs3d_from_normal(
         R = rotation_matrix_z(rotate_by)
         basis = apply_transform(basis, R)
 
+    if invert_dims is None:
+        invert_dims = [False, False, False]
+
     for i, invert in enumerate(invert_dims):
         if invert:
             basis[:, i] *= -1
@@ -175,7 +241,7 @@ def cs3d_from_normal(
     return CoordinateSystem(basis=basis, origin=p)
 
 
-# def cs3d_from_normal_rot(p, n, name="imaging_plane"):
+# def coordinate_system_from_normal_rot(p, n, name="imaging_plane"):
 #     yaw, pitch, roll = get_vector_angles(n)
 #     r1 = affine.rotation_matrix_x(pitch)
 #     r2 = affine.rotation_matrix_y(-roll)
@@ -196,21 +262,27 @@ def setup_coordinate_systems_3d(
     center_mlapdv: np.ndarray,
     brain_normal: np.ndarray,
     rotate_by: Optional[float] = None,
-    invert_dims: List[bool] = [False, False, False],
+    invert_dims: Optional[List[bool]] = None,
 ) -> LinkedCoordinateSystems:
-    """creates a coordinate system with an imaging plane oriented to the brain normal
+    """Create a linked set of 3D coordinate systems for imaging.
 
     Args:
-        center_mlapdv (np.ndarray): _description_
-        brain_normal (np.ndarray): _description_
+        center_mlapdv: Center point in ML/AP/DV order, shape `(3,)`.
+        brain_normal: Normal vector in ML/AP/DV order, shape `(3,)`.
+        rotate_by: Optional angle in radians to rotate the imaging plane about Z.
+        invert_dims: Optional length-3 boolean list to invert basis axes.
 
     Returns:
-        LinkedCoordinateSystems: _description_
+        A `LinkedCoordinateSystems` object containing `mlapdv` and
+        `imaging_plane` coordinate systems.
     """
+    if invert_dims is None:
+        invert_dims = [False, False, False]
+
     cs3d = LinkedCoordinateSystems(
         dict(
             mlapdv=CoordinateSystem(basis=np.identity(3), origin=np.zeros(3)),
-            imaging_plane=cs3d_from_normal(
+            imaging_plane=coordinate_system_from_normal(
                 center_mlapdv,
                 brain_normal,
                 rotate_by=rotate_by,
@@ -229,23 +301,32 @@ def create_coordinate_system_for_image(
     um_per_px: np.ndarray,  # pixel size in um
     ref_per_px: np.ndarray,  # pixel size in ref space
     img_topleft_ref: np.ndarray,  # the top left corner of the image in the reference frame
-    # img_topleft_um: np.ndarray,  # the top left corner of the image in um
     verify: bool = True,
-) -> CoordinateSystem:
+) -> LinkedCoordinateSystems:
+    """Generate linked coordinate systems for an image and its reference frame.
+
+    Args:
+        img_size_px: Image dimensions in pixels, shape `(2,)`.
+        um_per_px: Pixel size in micrometers, shape `(2,)`.
+        ref_per_px: Pixel size in reference units, shape `(2,)`.
+        img_topleft_ref: Top-left image corner in the reference frame,
+            shape `(2,)`.
+        verify: If true, validate coordinate relationships with assertions.
+
+    Returns:
+        A `LinkedCoordinateSystems` object for the image, pixel, um_image,
+        reference, and global um coordinate systems.
+    """
     # px_per_um = 1 / um_per_px
     img_size_um = img_size_px * um_per_px
-    # ref_per_px = img_size_ref / img_size_px
+    # ref_per_px = img_size_ref / img_size_px # could be an assertion
     px_per_ref = 1 / ref_per_px
     um_per_ref = um_per_px * px_per_ref
     ref_per_um = 1 / um_per_ref
 
-    # explain what this is really doing
-    # create a coordinate system where: 0,0 in pixel is the topleft corner
-    # the image is embedded in a larger reference frame, and it's topleft
+    # creates a coordinate system where: 0,0 in pixel indices is the topleft corner
+    # the image is embedded in a reference frame, and it's topleft
     # corner is at the location specified by img_topleft ref
-
-    # would somehow be more intuitive if ref_per_px is passed instead of size
-    # so the dimensions of a pixel are described in both spaces
 
     coordinate_systems = LinkedCoordinateSystems(
         dict(
@@ -269,9 +350,6 @@ def create_coordinate_system_for_image(
                 basis=np.diag(ref_per_um),
                 origin=np.zeros(2),
             ),
-            # TODO docme here why the origin of um is also 0,0
-            # because in our use case both ref and um share the same origin
-            # doens't need to be the case though!
         )
     )
     if verify:
@@ -320,8 +398,21 @@ def create_coordinate_system_for_image(
     return coordinate_systems
 
 
-def get_image_corners(img_size_px, coordinate_systems, to="um_global"):
-    # TODO DOCME
+def get_image_corners(
+    img_size_px: np.ndarray,
+    coordinate_systems: LinkedCoordinateSystems,
+    to: str = "um_global",  # TODO refactor me to 'in'
+) -> Dict[str, np.ndarray]:
+    """Return the corner coordinates of an image in a target coordinate system.
+
+    Args:
+        img_size_px: Image dimensions in pixels, shape `(2,)`.
+        coordinate_systems: A linked coordinate system containing `image`.
+        to: Name of the target coordinate system.
+
+    Returns:
+        A mapping of corner names to coordinates in the target system.
+    """
     img_size_px = np.array(img_size_px)  # cast just in case
     corners = dict(
         topleft=[0, 0],

@@ -1,15 +1,16 @@
-"""scanimage specific code"""
+from typing import Any, Dict, List, Optional, Sequence
 
-from typing import Optional, Dict, List
 import numpy as np
+import numpy.testing as nptest
+
 from plane2brain.coordinate_systems import (
     LinkedCoordinateSystems,
     create_coordinate_system_for_image,
 )
-import numpy.testing as nptest
 
 
-def _get_fov_uuids(scanimage_meta: dict) -> list:
+def _get_fov_uuids(scanimage_meta: dict[str, Any]) -> List[str]:
+    """Return all ScanImage field-of-view UUIDs from metadata."""
     scanimage_fov_metas = scanimage_meta["Artist"]["RoiGroups"]["imagingRoiGroup"][
         "rois"
     ]
@@ -17,12 +18,19 @@ def _get_fov_uuids(scanimage_meta: dict) -> list:
 
 
 def get_scanfield_size_ref(
-    scanimage_fov_meta: dict,
-    dims=["X", "Y"],
-):
+    scanimage_fov_meta: dict[str, Any],
+    dims: Sequence[str] = ("X", "Y"),
+) -> Sequence[np.ndarray, np.ndarray]:
+    """Read scanfield size and center from ScanImage FOV metadata.
+
+    Args:
+        scanimage_fov_meta: A single FOV metadata block from ScanImage.
+        dims: The axis order for the returned arrays. Use
+            `(X, Y)` by default, or `(Y, X)` to swap axes.
+    """
     fov_size_ref = np.array(scanimage_fov_meta["scanfields"]["sizeXY"])
     fov_center_ref = np.array(scanimage_fov_meta["scanfields"]["centerXY"])
-    if dims == ["Y", "X"]:
+    if dims == ("Y", "X"):
         fov_size_ref = fov_size_ref[::-1]
         fov_center_ref = fov_center_ref[::-1]
 
@@ -30,22 +38,25 @@ def get_scanfield_size_ref(
 
 
 def get_scanfield_size_px(
-    scanimage_fov_meta: dict,
-    dims=["X", "Y"],
-):
+    scanimage_fov_meta: dict[str, Any],
+    dims: Sequence[str] = ("X", "Y"),
+) -> np.ndarray:
+    """Read the scanfield pixel dimensions from ScanImage FOV metadata."""
     fov_size_px = np.array(scanimage_fov_meta["scanfields"]["pixelResolutionXY"])
-    if dims == ["Y", "X"]:
+    if dims == ("Y", "X"):
         fov_size_px = fov_size_px[::-1]
 
     return fov_size_px
 
 
 def get_resolution_from_scanimage_meta(
-    scanimage_meta: dict,
-    dims=["X", "Y"],
+    scanimage_meta: dict[str, Any],
+    dims: Sequence[str] = ("X", "Y"),
 ) -> np.ndarray:
-    # X is the line scan (resonant)
-    # are the individual lines, e.g. 512 pixels per line and 512 lines
+    """Convert ScanImage resolution metadata to micrometers per pixel.
+
+    The returned array is ordered according to `dims`.
+    """
     px_per_um = np.zeros(2)
     for i, d in enumerate(dims):
         res = scanimage_meta[f"{d}Resolution"]
@@ -53,15 +64,17 @@ def get_resolution_from_scanimage_meta(
             case "centimeter":
                 px_per_um[i] = res * 1e-4
             case _:
-                "Reference image resolution unit must be in centimeters"
-    um_per_px = 1 / px_per_um
-    return um_per_px
+                raise ValueError(
+                    "Reference image resolution unit must be in centimeters"
+                )
+    return 1 / px_per_um
 
 
 def get_fov_meta(
-    scanimage_meta: dict,
+    scanimage_meta: dict[str, Any],
     fov_uuid: str,
-) -> dict:
+) -> dict[str, Any]:
+    """Return the metadata block corresponding to the specified FOV UUID."""
     (scanimage_fov_meta,) = [
         meta
         for meta in scanimage_meta["Artist"]["RoiGroups"]["imagingRoiGroup"]["rois"]
@@ -71,24 +84,33 @@ def get_fov_meta(
 
 
 def create_coordinate_systems_from_scanimage_meta(
-    scanimage_meta: dict,
+    scanimage_meta: dict[str, Any],
     fov_uuids: Optional[List[str]] = None,
-    dims: List = ["X", "Y"],
+    dims: Sequence[str] = ("X", "Y"),
 ) -> Dict[str, LinkedCoordinateSystems]:
-    # all FOVs or subselection
+    """Build `LinkedCoordinateSystems` objects for all ScanImage scanfields.
+
+    Args:
+        scanimage_meta: Full ScanImage metadata dictionary.
+        fov_uuids: Optional list of FOV UUIDs to process. If omitted, all FOVs
+            in `scanimage_meta` are processed.
+        dims: The axis order used for X/Y metadata values.
+
+    Returns:
+        A mapping from FOV UUIDs to `LinkedCoordinateSystems`.
+    """
     if fov_uuids is None:
         fov_uuids = _get_fov_uuids(scanimage_meta)
 
     # pixel resolution from metadata
     um_per_px = get_resolution_from_scanimage_meta(scanimage_meta, dims=dims)
-    coordinate_systems = {}
+    coordinate_systems: Dict[str, LinkedCoordinateSystems] = {}
 
     for fov_uuid in fov_uuids:
         scanimage_fov_meta = get_fov_meta(scanimage_meta, fov_uuid)
-        # misleading variable naming by scanimage but here too X is the line = resonant scanner, and Y is the line number
+        # misleading variable naming by ScanImage but here too X is the line = resonant scanner, and Y is the line number
         # this, combined with the fact that on the reference image, the strips are extended vertically
         # means: XY is AP, ML
-        # fov_size_px = np.array(scanimage_fov_meta["scanfields"]["pixelResolutionXY"])
         fov_size_px = get_scanfield_size_px(scanimage_fov_meta, dims=dims)
         fov_size_um = fov_size_px * um_per_px
 
@@ -100,8 +122,6 @@ def create_coordinate_systems_from_scanimage_meta(
         # see below for proof at (*)
 
         # the center and size are expressed in the scanfield coordinate system
-        # fov_size_ref = np.array(scanimage_fov_meta["scanfields"]["sizeXY"])
-        # fov_center_ref = np.array(scanimage_fov_meta["scanfields"]["centerXY"])
         fov_size_ref, fov_center_ref = get_scanfield_size_ref(
             scanimage_fov_meta, dims=dims
         )
@@ -150,7 +170,8 @@ def create_coordinate_systems_from_scanimage_meta(
             fov_size_px,
         )
         nptest.assert_array_almost_equal(
-            coordinate_system.transform(np.zeros(2), "pixel", "ref"), fov_topleft_ref
+            coordinate_system.transform(np.zeros(2), "pixel", "ref"),
+            fov_topleft_ref,
         )
         nptest.assert_array_almost_equal(
             coordinate_system.transform(fov_bottomright_ref, "ref", "um_global")
@@ -163,26 +184,30 @@ def create_coordinate_systems_from_scanimage_meta(
 
 
 def extract_fov_depths_from_scanimage_meta(
-    scanimage_meta: dict,
-    scanimage_params: dict,
-    fov_uuids: Optional[List[str]] = None,
+    scanimage_meta: dict[str, Any],
+    scanimage_params: dict[str, Any],
+    fov_uuids: Optional[Sequence[str]] = None,
 ) -> Dict[str, np.float64]:
-    """from scanimage metadata, extract the imaged depths of all field of views,
-    return as a dict with fov name (uuids) and corresponding depth"""
+    """Extract the depth of each ScanImage FOV from metadata.
+
+    Args:
+        scanimage_meta: Full ScanImage metadata dictionary.
+        scanimage_params: ScanImage acquisition parameters.
+        fov_uuids: Optional list of FOV UUIDs to extract. If omitted, all FOVs
+            in the metadata are extracted.
+
+    Returns:
+        Mapping from FOV UUID to imaged depth in micrometers.
+    """
     if fov_uuids is None:
         fov_uuids = _get_fov_uuids(scanimage_meta)
-
-    # get the metadata for the fovs by given uuids
-    scanimage_fov_metas = scanimage_meta["Artist"]["RoiGroups"]["imagingRoiGroup"][
-        "rois"
-    ]
     # extract the depth - a combination of the voicecoil (fast-z)
     # and gantry position
+    # TODO VERIFY -> ask Krumin
+    # that this is the correct way how they are comined!
     fastz_pos = scanimage_params["hFastZ"]["position"]
     fov_depths = {}
     for fov_uuid in fov_uuids:
-        (fov_meta,) = [
-            meta for meta in scanimage_fov_metas if meta["roiUuid"] == fov_uuid
-        ]
+        fov_meta = get_fov_meta(scanimage_meta, fov_uuid)
         fov_depths[fov_uuid] = -1 * (fov_meta["zs"] + fastz_pos)
     return fov_depths
