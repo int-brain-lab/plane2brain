@@ -1,22 +1,72 @@
-# TODO this should go to tests
-# %% some plots to verify these functions
-# a coordinate system
-# basis = np.identity(2)
-# origin = np.array([4, 4])
-# cs1 = CoordinateSystem(basis=basis, origin=origin)
+import unittest
 
-# # another coordinate system, translated
-# origin_t = np.array([2, 2])
-# basis_t = np.identity(2)
-# basis_t[0,0] *= 2
+import numpy as np
+import numpy.testing as nptest
 
-# cs2 = CoordinateSystem(basis=basis_t, origin=origin_t)
-# cs = LinkedCoordinateSystems(dict(original=cs1, translated=cs2))
+from plane2brain.coordinate_systems import create_coordinate_system_for_image
 
-# axes = cs.plot(color_by="axis", scale=1)
 
-# cs.transform(np.array([0, 0]), "original", "translated") # -2, -2
-# cs.transform(np.array([-1, -1]), "translated", "original")
+class TestCoordinateSystems(unittest.TestCase):
+    def test_create_coordinate_system_for_image_verification(self):
+        img_size_px = np.array([100, 200])
+        um_per_px = np.array([0.5, 0.3])
+        ref_per_px = np.array([0.2, 0.4])
+        img_topleft_ref = np.array([10.0, 20.0])
+
+        coordinate_systems = create_coordinate_system_for_image(
+            img_size_px=img_size_px,
+            um_per_px=um_per_px,
+            ref_per_px=ref_per_px,
+            img_topleft_ref=img_topleft_ref,
+        )
+
+        img_size_um = img_size_px * um_per_px
+        img_size_ref = img_size_px * ref_per_px
+        img_bottomright_ref = img_topleft_ref + img_size_ref
+
+        nptest.assert_array_almost_equal(
+            coordinate_systems.transform(img_topleft_ref, "ref", "pixel"),
+            np.zeros(2),
+        )
+        nptest.assert_array_almost_equal(
+            coordinate_systems.transform(np.zeros(2), "pixel", "ref"),
+            img_topleft_ref,
+        )
+        nptest.assert_array_almost_equal(
+            coordinate_systems.transform(img_bottomright_ref, "ref", "pixel"),
+            img_size_px,
+        )
+        nptest.assert_array_almost_equal(
+            coordinate_systems.transform(np.zeros(2), "pixel", "ref"),
+            img_topleft_ref,
+        )
+        nptest.assert_array_almost_equal(
+            coordinate_systems.transform(img_bottomright_ref, "ref", "um_global")
+            - coordinate_systems.transform(img_topleft_ref, "ref", "um_global"),
+            img_size_um,
+        )
+        nptest.assert_array_almost_equal(
+            coordinate_systems.transform(np.zeros(2), "pixel", "image"), np.zeros(2)
+        )
+        nptest.assert_array_almost_equal(
+            coordinate_systems.transform(img_size_px, "pixel", "image"), np.ones(2)
+        )
+        nptest.assert_array_almost_equal(
+            coordinate_systems.transform(np.ones(2), "image", "pixel"),
+            img_size_px,
+        )
+        nptest.assert_array_almost_equal(
+            coordinate_systems.transform(np.ones(2), "image", "um_image"),
+            img_size_um,
+        )
+        nptest.assert_array_almost_equal(
+            coordinate_systems.transform((0, 1), "image", "um_image"),
+            (0, img_size_um[1]),
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()
 
 
 # # %%

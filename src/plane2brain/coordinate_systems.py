@@ -2,13 +2,24 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 from numpy import linalg
-import numpy.testing as nptest
 import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.axes import Axes
 
 from plane2brain.affine import rotation_matrix_z, apply_transform
 from plane2brain.plotters import plot_line
+
+"""
+ 
+  ######  ##          ###     ######   ######  ########  ######  
+ ##    ## ##         ## ##   ##    ## ##    ## ##       ##    ## 
+ ##       ##        ##   ##  ##       ##       ##       ##       
+ ##       ##       ##     ##  ######   ######  ######    ######  
+ ##       ##       #########       ##       ## ##             ## 
+ ##    ## ##       ##     ## ##    ## ##    ## ##       ##    ## 
+  ######  ######## ##     ##  ######   ######  ########  ######  
+ 
+"""
 
 
 class CoordinateSystem:
@@ -189,7 +200,123 @@ class LinkedCoordinateSystems:
         return f"{type(self)} with named coordinate systems: {list(self.coordinate_systems.keys())}"
 
 
-# TODO refactor
+"""
+ 
+  #######  ########  
+ ##     ## ##     ## 
+        ## ##     ## 
+  #######  ##     ## 
+ ##        ##     ## 
+ ##        ##     ## 
+ ######### ########  
+ 
+"""
+
+
+# TODO
+def create_coordinate_system_for_image(
+    img_size_px: np.ndarray,  # in pixel
+    um_per_px: np.ndarray,  # pixel size in um
+    ref_per_px: np.ndarray,  # pixel size in ref space
+    img_topleft_ref: np.ndarray,  # the top left corner of the image in the reference frame
+    verify: bool = True,
+) -> LinkedCoordinateSystems:
+    """Generate linked coordinate systems for an image and its reference frame.
+
+    Args:
+        img_size_px: Image dimensions in pixels, shape `(2,)`.
+        um_per_px: Pixel size in micrometers, shape `(2,)`.
+        ref_per_px: Pixel size in reference units, shape `(2,)`.
+        img_topleft_ref: Top-left image corner in the reference frame,
+            shape `(2,)`.
+        verify: If true, validate coordinate relationships with assertions.
+
+    Returns:
+        A `LinkedCoordinateSystems` object for the image, pixel, um_image,
+        reference, and global um coordinate systems.
+    """
+    img_size_um = img_size_px * um_per_px
+    px_per_ref = 1 / ref_per_px
+    um_per_ref = um_per_px * px_per_ref
+    ref_per_um = 1 / um_per_ref
+
+    # creates a coordinate system where: 0,0 in pixel indices is the topleft corner
+    # the image is embedded in a reference frame, and it's topleft
+    # corner is at the location specified by img_topleft ref
+
+    coordinate_systems = LinkedCoordinateSystems(
+        dict(
+            ref=CoordinateSystem(
+                basis=np.identity(2),
+                origin=np.zeros(2),
+            ),
+            pixel=CoordinateSystem(
+                basis=np.diag(ref_per_px),
+                origin=img_topleft_ref,
+            ),
+            um_image=CoordinateSystem(
+                basis=np.diag(ref_per_um),
+                origin=img_topleft_ref,
+            ),
+            image=CoordinateSystem(
+                basis=np.diag(ref_per_um * img_size_um),
+                origin=img_topleft_ref,
+            ),
+            um_global=CoordinateSystem(
+                basis=np.diag(ref_per_um),
+                origin=np.zeros(2),
+            ),
+        )
+    )
+    # verification moved to dedicated tests
+    if verify:
+        pass
+
+    return coordinate_systems
+
+
+def get_image_corners(
+    img_size_px: np.ndarray,
+    coordinate_systems: LinkedCoordinateSystems,
+    to: str = "um_global",  # TODO refactor me to 'in'
+) -> Dict[str, np.ndarray]:
+    """Return the corner coordinates of an image in a target coordinate system.
+
+    Args:
+        img_size_px: Image dimensions in pixels, shape `(2,)`.
+        coordinate_systems: A linked coordinate system containing `image`.
+        to: Name of the target coordinate system.
+
+    Returns:
+        A mapping of corner names to coordinates in the target system.
+    """
+    img_size_px = np.array(img_size_px)  # cast just in case
+    corners = dict(
+        topleft=[0, 0],
+        topright=[0, 1],
+        bottomleft=[1, 0],
+        bottomright=[1, 1],
+        center=img_size_px / 2,
+    )
+    return {
+        name: coordinate_systems.transform(np.array(corner), "image", to)
+        for name, corner in corners.items()
+    }
+
+
+"""
+ 
+  #######  ########  
+ ##     ## ##     ## 
+        ## ##     ## 
+  #######  ##     ## 
+        ## ##     ## 
+ ##     ## ##     ## 
+  #######  ########  
+ 
+"""
+
+
 def coordinate_system_from_normal(
     p: np.ndarray,  # point
     n: np.ndarray,  # normal
@@ -277,136 +404,3 @@ def setup_coordinate_systems_3d(
     # TODO verify
 
     return cs3d
-
-
-def create_coordinate_system_for_image(
-    img_size_px: np.ndarray,  # in pixel
-    um_per_px: np.ndarray,  # pixel size in um
-    ref_per_px: np.ndarray,  # pixel size in ref space
-    img_topleft_ref: np.ndarray,  # the top left corner of the image in the reference frame
-    verify: bool = True,
-) -> LinkedCoordinateSystems:
-    """Generate linked coordinate systems for an image and its reference frame.
-
-    Args:
-        img_size_px: Image dimensions in pixels, shape `(2,)`.
-        um_per_px: Pixel size in micrometers, shape `(2,)`.
-        ref_per_px: Pixel size in reference units, shape `(2,)`.
-        img_topleft_ref: Top-left image corner in the reference frame,
-            shape `(2,)`.
-        verify: If true, validate coordinate relationships with assertions.
-
-    Returns:
-        A `LinkedCoordinateSystems` object for the image, pixel, um_image,
-        reference, and global um coordinate systems.
-    """
-    # px_per_um = 1 / um_per_px
-    img_size_um = img_size_px * um_per_px
-    # ref_per_px = img_size_ref / img_size_px # could be an assertion
-    px_per_ref = 1 / ref_per_px
-    um_per_ref = um_per_px * px_per_ref
-    ref_per_um = 1 / um_per_ref
-
-    # creates a coordinate system where: 0,0 in pixel indices is the topleft corner
-    # the image is embedded in a reference frame, and it's topleft
-    # corner is at the location specified by img_topleft ref
-
-    coordinate_systems = LinkedCoordinateSystems(
-        dict(
-            ref=CoordinateSystem(
-                basis=np.identity(2),
-                origin=np.zeros(2),
-            ),
-            pixel=CoordinateSystem(
-                basis=np.diag(ref_per_px),
-                origin=img_topleft_ref,
-            ),
-            um_image=CoordinateSystem(
-                basis=np.diag(ref_per_um),
-                origin=img_topleft_ref,
-            ),
-            image=CoordinateSystem(
-                basis=np.diag(ref_per_um * img_size_um),
-                origin=img_topleft_ref,
-            ),
-            um_global=CoordinateSystem(
-                basis=np.diag(ref_per_um),
-                origin=np.zeros(2),
-            ),
-        )
-    )
-    # TODO turn these into tests? Discuss
-    # many are redundant as well
-    if verify:
-        img_size_ref = img_size_px * ref_per_px
-        img_bottomright_ref = img_topleft_ref + img_size_ref
-        # the image size assertion
-        nptest.assert_array_almost_equal(
-            coordinate_systems.transform(img_topleft_ref, "ref", "pixel"),
-            np.zeros(2),
-        )
-        nptest.assert_array_almost_equal(
-            coordinate_systems.transform(np.zeros(2), "pixel", "ref"),
-            img_topleft_ref,
-        )
-        nptest.assert_array_almost_equal(
-            coordinate_systems.transform(img_bottomright_ref, "ref", "pixel"),
-            img_size_px,
-        )
-        nptest.assert_array_almost_equal(
-            coordinate_systems.transform(np.zeros(2), "pixel", "ref"),
-            img_topleft_ref,
-        )
-        nptest.assert_array_almost_equal(
-            coordinate_systems.transform(img_bottomright_ref, "ref", "um_global")
-            - coordinate_systems.transform(img_topleft_ref, "ref", "um_global"),
-            img_size_um,
-        )
-        nptest.assert_array_almost_equal(
-            coordinate_systems.transform(np.zeros(2), "pixel", "image"), np.zeros(2)
-        )
-        nptest.assert_array_almost_equal(
-            coordinate_systems.transform(img_size_px, "pixel", "image"), np.ones(2)
-        )
-        nptest.assert_array_almost_equal(
-            coordinate_systems.transform(np.ones(2), "image", "pixel"),
-            img_size_px,
-        )
-        nptest.assert_array_almost_equal(
-            coordinate_systems.transform(np.ones(2), "image", "um_image"),
-            img_size_um,
-        )
-        nptest.assert_array_almost_equal(
-            coordinate_systems.transform((0, 1), "image", "um_image"),
-            (0, img_size_um[1]),
-        )
-    return coordinate_systems
-
-
-def get_image_corners(
-    img_size_px: np.ndarray,
-    coordinate_systems: LinkedCoordinateSystems,
-    to: str = "um_global",  # TODO refactor me to 'in'
-) -> Dict[str, np.ndarray]:
-    """Return the corner coordinates of an image in a target coordinate system.
-
-    Args:
-        img_size_px: Image dimensions in pixels, shape `(2,)`.
-        coordinate_systems: A linked coordinate system containing `image`.
-        to: Name of the target coordinate system.
-
-    Returns:
-        A mapping of corner names to coordinates in the target system.
-    """
-    img_size_px = np.array(img_size_px)  # cast just in case
-    corners = dict(
-        topleft=[0, 0],
-        topright=[0, 1],
-        bottomleft=[1, 0],
-        bottomright=[1, 1],
-        center=img_size_px / 2,
-    )
-    return {
-        name: coordinate_systems.transform(np.array(corner), "image", to)
-        for name, corner in corners.items()
-    }
