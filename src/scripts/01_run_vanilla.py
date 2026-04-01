@@ -46,7 +46,7 @@ coords_px = suite2p.data_loader(stat_paths, fov_map)  # refactor: rename coords_
 
 # this is defined
 scanner_orientation = dict(rotation=0.0, invert_axis=[True, True, False])
-dims = ["Y", "X"]
+dims = ("Y", "X")
 
 # this is the atlas to project onto
 atlas = ProjectionAtlas(res_um=50)

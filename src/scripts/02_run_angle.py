@@ -73,7 +73,7 @@ ref_img_size_px = np.array(ref_img_stack[0].shape)  # ml,ap
 # scanimage metadata is by default stored as XY
 # with: X is the resonant dimension
 # which in our reference image is the second dimension
-dims = ["Y", "X"]
+dims = ("Y", "X")
 
 # image resolution and dimensions of the reference stack
 # in um

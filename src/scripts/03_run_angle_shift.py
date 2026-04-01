@@ -76,7 +76,7 @@ ref_img_size_px = np.array(ref_img_stack[0].shape)  # ml,ap
 # scanimage metadata is by default stored as XY
 # with: X is the resonant dimension
 # which in our reference image is the second dimension
-dims = ["Y", "X"]
+dims = ("Y", "X")
 
 # image resolution and dimensions of the reference stack
 # in um
@@ -404,7 +404,7 @@ coordinate_systems_3d = setup_coordinate_systems_3d(
 # this requires a coordinate system for 3d
 optical_axis = (
     coordinate_systems_3d.transform(n_surface, "imaging_plane", "mlapdv")
-    - ref_point_mlapdv  # this translation part is only relevant for plotting purposes
+    - ref_point_mlapdv
 )
 
 # set up a new 3d coordinate system with the imaging plane, now adjusted by the difference
