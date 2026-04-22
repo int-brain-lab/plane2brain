@@ -131,17 +131,6 @@ ref_sess_ref_stack_path = ibl.get_reference_stack_path(
 
 
 # %%
-from ibllib.mpci.tasks import MesoscopeFOVHistology
-
-session_path = one.eid2path(eid)
-reference_session_path = one.eid2path(eid_ref)
-meso_task = MesoscopeFOVHistology(
-    session_path=session_path, reference_session=reference_session_path, one=ONE()
-)
-
-meso_task.load_reference_stack()
-
-# %%
 # the transform between them
 _, transform_params = register_reference_stacks(ref_stack_path, ref_sess_ref_stack_path)
 

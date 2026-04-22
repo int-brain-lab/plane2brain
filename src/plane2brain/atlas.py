@@ -91,6 +91,29 @@ class ProjectionAtlas(AllenAtlas):
                 n *= -1
         return p, n
 
+    def get_dv_for_mlap(
+        self,
+        coords_mlap: np.ndarray,
+    ) -> np.ndarray:
+        # for mlap coordinates, complete to mlapdv by getting the dv from the atlas
+        coords_mlapdv = np.zeros((coords_mlap.shape[0], 3))
+        for i, _coords in enumerate(coords_mlap):
+            _coords = np.append(_coords, 0.0)
+            try:
+                faces, intersection_points, ix = intersect_line_mesh_nb(
+                    self.mesh["vertices"],
+                    self.mesh["edges"],
+                    _coords,
+                    np.array([0.0, 0.0, -1.0]),
+                )
+                _, ix = get_closest_face(faces, _coords)
+                coords_mlapdv[i] = intersection_points[ix]
+            except ValueError:
+                # TODO logger warn
+                coords_mlapdv[i, :] = np.nan
+
+        return coords_mlapdv
+
     def get_labels_for_mlapdv(
         self,
         coords_mlapdv: np.ndarray,
