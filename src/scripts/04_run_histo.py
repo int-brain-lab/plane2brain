@@ -1,4 +1,5 @@
 # %%
+import sys
 import numpy as np
 from plane2brain import plotters, projections, scanimage, suite2p, ibl
 from plane2brain.coordinate_systems import (
@@ -17,7 +18,7 @@ import skimage
 # BASE_FOLDER = Path("/mnt/s0/Data/Subjects")
 LOCATION = "local"
 SAVE_OUTPUT = False
-PLOT = True
+PLOT = False
 
 # %%
 """
@@ -38,7 +39,9 @@ dims = ("Y", "X")
 
 one = ONE()
 # eid = one.ref2eid(dict(subject="SP058", date="2024-07-25", sequence="001"))
-eid = one.ref2eid(dict(subject="SP058", date="2024-08-01", sequence="001"))
+# eid = one.ref2eid(dict(subject="SP058", date="2024-08-01", sequence="001"))
+session_path = sys.argv[1]
+eid = one.path2eid(session_path)
 
 # load the reference image metadata
 ref_img_meta = ibl.load_reference_stack_metadata(eid, one, location=LOCATION)
@@ -88,10 +91,7 @@ um_per_px = scanimage.get_resolution_from_scanimage_meta(
 ref_img_size_um = ref_img_size_px * um_per_px
 
 # the center of the craniotomy is not always exactly at the center
-# of the image, we adjust for this here
-# NOTE don't do this for the reference session
-# ref_point["mlap_adjusted"] = ref_point["mlap"] + ref_point["xy"] * um_per_px
-# ref_img_topleft_um = ref_point["mlap_adjusted"] - ref_img_size_um / 2
+# but: in this case we have histology, so we infer the offset from there
 
 # %%
 """
@@ -144,7 +144,11 @@ ref_sess_ref_stack_path = ibl.get_reference_stack_path(
 # meso_task.load_reference_stack()
 
 # %% load the data from a local source and use miles code to convert to mlap
-ccf_idx = np.load("/home/georg/data_local/referenceImage.mlapdv.npy")
+if LOCATION == 'local':
+    ccf_idx = np.load("/home/georg/data_local/referenceImage.mlapdv.npy")
+elif LOCATION == 'server':
+    ccf_idx = np.load("/home/ibladmin/Documents/georg/data_local/referenceImage.mlapdv.npy")
+
 from iblatlas.atlas import MRITorontoAtlas
 
 ba = MRITorontoAtlas(res_um=25)
@@ -234,9 +238,12 @@ for fov_name, uuid in fov_map.items():
     # this step: for each session that is not the ref session
     coords_um_global = coordinate_systems_2d[uuid].transform(px, "pixel", "um_global")
     # applies the per session shift as inferred by the transform betwen
-    coords_um_global = (
-        coords_um_global + session_shift_um
-    )  # TODO figure out if plus or minus
+    # not for the reference session
+    # is probably safe to leave it inas the shift will be 0, but just to be explicit
+    if eid != eid_ref:
+        coords_um_global = (
+            coords_um_global + session_shift_um
+        )  # TODO figure out if plus or minus
     px = coordinate_systems_ref.transform(coords_um_global, "um_global", "pixel")
     # transform to ref
     cpx_i = interp_xy(smoothed, *px.T)
@@ -256,8 +263,9 @@ center_mlap = interp_xy(smoothed, i,j)
 ref_point["mlap_adjusted"] = center_mlap
 
 # additionally, if this is not the reference session:
-# TODO figure out if this is plus or minus
-# ref_point["mlap_adjusted"] = ref_point["mlap_adjusted"] + transform_params["translation"] * um_per_px
+if eid != eid_ref:
+    # TODO figure out if this is plus or minus
+    ref_point["mlap_adjusted"] = ref_point["mlap_adjusted"] + transform_params["translation"] * um_per_px
 
 
 
@@ -336,7 +344,7 @@ for name, uuid in fov_map.items():
 
 # %% map anything mlapdv to brain area
 for name, uuid in fov_map.items():
-    ids, ix, rgba, acronym = atlas.get_labels_for_mlapdv(coords[uuid]["reprojected"])
+    ids, ix, rgba, acronym = atlas.get_labels_for_mlapdv(coords[uuid]["reprojected_histo"])
     coords[uuid]["atlas_rgba"] = rgba
     coords[uuid]["atlas_acronym"] = acronym
     coords[uuid]["atlas_id"] = ids
@@ -369,7 +377,7 @@ for name, uuid in fov_map.items():
 if SAVE_OUTPUT:
     for name, uuid in fov_map.items():
         session_folder = ibl._eid2path(eid, one, location=LOCATION)
-        coords_mlapdv = coords[uuid]["reprojected"]
+        coords_mlapdv = coords[uuid]["reprojected_histo"]
         # saving the updated coordinates
         np.save(
             session_folder / "alf" / name / "mpciROIs.mlapdv_histo_projection.npy",
