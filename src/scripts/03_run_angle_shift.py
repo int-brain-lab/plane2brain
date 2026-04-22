@@ -31,24 +31,24 @@ PLOT = True
  
 """
 
+# this is defined
+scanner_orientation = dict(rotation=0.0, invert_axis=[True, True, False])
+dims = ("Y", "X")
+
 one = ONE()
 # eid = one.ref2eid(dict(subject="SP058", date="2024-07-25", sequence="001"))
 eid = one.ref2eid(dict(subject="SP058", date="2024-08-01", sequence="001"))
 
 # load the reference image metadata
 ref_img_meta = ibl.load_reference_stack_metadata(eid, one, location=LOCATION)
-ref_point_mlap, ref_point_ref = ibl.load_reference_points_from_meta(
-    ref_img_meta, use_resolved=True
+ref_point = ibl.load_reference_points_from_meta(
+    ref_img_meta
 )  # the craniotomy center, both in ml,ap (histology resolved) and in
-# the reference space of scanimage (galvos)
 
 # load the suite2p data
 raw_imaging_meta, stat_paths, fov_map = ibl.load_fov_data(eid, one, location=LOCATION)
 fov_names = sorted(list(fov_map.keys()))
 coords_px = suite2p.data_loader(stat_paths, fov_map)  # refactor: rename coords_px
-
-# this is defined
-scanner_orientation = dict(rotation=0.0, invert_axis=[True, True, False])
 
 # this is the atlas to project onto
 atlas = ProjectionAtlas(res_um=50)
@@ -85,6 +85,11 @@ um_per_px = scanimage.get_resolution_from_scanimage_meta(
     dims=dims,
 )
 ref_img_size_um = ref_img_size_px * um_per_px
+
+# the center of the craniotomy is not always exactly at the center
+# of the image, we adjust for this here
+ref_point["mlap_adjusted"] = ref_point["mlap"] + ref_point["xy"] * um_per_px
+ref_img_topleft_um = ref_point["mlap_adjusted"] - ref_img_size_um / 2
 
 # %%
 """
@@ -124,6 +129,19 @@ ref_sess_ref_stack_path = ibl.get_reference_stack_path(
     ),
 )
 
+
+# %%
+from ibllib.mpci.tasks import MesoscopeFOVHistology
+
+session_path = one.eid2path(eid)
+reference_session_path = one.eid2path(eid_ref)
+meso_task = MesoscopeFOVHistology(
+    session_path=session_path, reference_session=reference_session_path, one=ONE()
+)
+
+meso_task.load_reference_stack()
+
+# %%
 # the transform between them
 _, transform_params = register_reference_stacks(ref_stack_path, ref_sess_ref_stack_path)
 
@@ -135,7 +153,9 @@ ref_transform = skimage.transform.EuclideanTransform(
     translation=transform_params["translation"],
 )
 
-ref_point_mlap = ref_point_mlap + transform_params["translation"] * um_per_px
+ref_point["mlap_adjusted_shifted"] = (
+    ref_point["mlap_adjusted"] + transform_params["translation"] * um_per_px
+)
 
 
 """
@@ -149,7 +169,7 @@ ref_point_mlap = ref_point_mlap + transform_params["translation"] * um_per_px
   ######   #######  ##    ##    ##    #### ##    ##  #######  ######## 
  
 """
-ref_img_topleft_um = ref_point_mlap - ref_img_size_um / 2
+ref_img_topleft_um = ref_point["mlap_adjusted_shifted"] - ref_img_size_um / 2
 
 # inferring the the "virtual corner" of the reference stack image
 # in ref
@@ -216,7 +236,7 @@ axes = plotters.plot_brain_surface_points(atlas.get_surface_points())
 
 # the coordinate systems
 ref_point_mlapdv, brain_normal_at_ref = atlas.get_plane_at_point_mlap(
-    *ref_point_mlap,
+    *ref_point["mlap_adjusted_shifted"],
     numba=True,
 )
 coordinate_systems_3d = setup_coordinate_systems_3d(
@@ -281,7 +301,7 @@ axes.set_aspect("equal")
 line_kwargs = dict(linestyle=":", lw=1, alpha=1, color="r")
 axes.axhline(0, **line_kwargs)
 axes.axvline(0, **line_kwargs)
-circle_center = ref_point_mlap[::-1]
+circle_center = ref_point["mlap_adjusted_shifted"][::-1]
 # circle_center = [0, 0]
 circle = plt.Circle(circle_center, 2500, fill=False, color="r")
 axes.add_patch(circle)
@@ -388,7 +408,7 @@ p_surface, n_surface, dv_avg = projections.get_brain_surface_normal(
 # this gets the dv component for the ref point, as well as the brain normal at that
 # location
 ref_point_mlapdv, brain_normal_at_ref = atlas.get_plane_at_point_mlap(
-    *ref_point_mlap,
+    *ref_point["mlap_adjusted_shifted"],
     numba=True,
 )
 

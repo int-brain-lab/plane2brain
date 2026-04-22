@@ -159,27 +159,23 @@ def load_reference_stack_metadata(
 
 def load_reference_points_from_meta(
     ref_img_meta: dict,
-    use_resolved: bool = True,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> dict:
     # in our case the known point is the center of the craniotomy
+    ref_point = {
+        "mlap": np.array(
+            [ref_img_meta["centerMM"][key] * 1e3 for key in ["ML", "AP"]],
+        ),
+        "xy": np.array(
+            [ref_img_meta["centerMM"][key] for key in ["x", "y"]],
+        ),
+        "deg": np.array(
+            [ref_img_meta["centerDeg"][key] for key in ["x", "y"]],
+        ),
+    }
+    return ref_point
 
-    # the contents of ref_img_meta['centerMM'] are:
-    #   x/y pixel offset difference from nx/2, ny/2
-    #   ML/AP are ml ap coordinates
-    ref_point_mlap = []
-    for key in ["ML", "AP"]:
-        if key + "_resolved" in ref_img_meta["centerMM"] and use_resolved:
-            key = key + "_resolved"
-        ref_point_mlap.append(ref_img_meta["centerMM"][key] * 1e3)
-    ref_point_mlap = np.array(ref_point_mlap)
 
-    # ref is the coordinate system of scanimage (galvo angle)
-    # TODO although ... I think this is wrong
-    ref_point_ref = []
-    for key in ["x", "y"]:
-        ref_point_ref.append(ref_img_meta["centerDeg"][key])
-    ref_point_ref = np.array(ref_point_ref)
-    return ref_point_mlap, ref_point_ref
+## get miles load reference stack function
 
 
 def infer_imaging_collection(eid: str, one: ONE, location="server") -> str:
@@ -307,7 +303,7 @@ def load_roi_mlapdv(
                 mlapdv = one.load_dataset(eid, dataset, collection=f"alf/{fov}")
             else:
                 # dataset it not available via one
-                # make a general copy dataset function from the sraps above
+                # make a general copy dataset function from the scraps above
                 raise NotImplementedError
     return mlapdv
 
@@ -315,7 +311,7 @@ def load_roi_mlapdv(
 def infer_ref_stack_virtual_corner(
     ref_img_scanimage_meta: dict,
     ref_img_size_px: np.ndarray,  # in 2d (X,Y)
-    dims: List = ["X", "Y"],
+    dims: Tuple = ("X", "Y"),
 ):
     # get the corner of the reference stack in ref space
     # TODO refactor me

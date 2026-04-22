@@ -219,7 +219,6 @@ def create_coordinate_system_for_image(
     um_per_px: np.ndarray,  # pixel size in um
     ref_per_px: np.ndarray,  # pixel size in ref space
     img_topleft_ref: np.ndarray,  # the top left corner of the image in the reference frame
-    verify: bool = True,
 ) -> LinkedCoordinateSystems:
     """Generate linked coordinate systems for an image and its reference frame.
 
@@ -268,10 +267,6 @@ def create_coordinate_system_for_image(
             ),
         )
     )
-    # verification moved to dedicated tests
-    if verify:
-        pass
-
     return coordinate_systems
 
 
@@ -386,9 +381,6 @@ def setup_coordinate_systems_3d(
         A `LinkedCoordinateSystems` object containing `mlapdv` and
         `imaging_plane` coordinate systems.
     """
-    if invert_dims is None:
-        invert_dims = [False, False, False]
-
     cs3d = LinkedCoordinateSystems(
         dict(
             mlapdv=CoordinateSystem(basis=np.identity(3), origin=np.zeros(3)),
@@ -401,6 +393,6 @@ def setup_coordinate_systems_3d(
         )
     )
 
-    # TODO verify
+    # TODO add tests for the 3d case
 
     return cs3d

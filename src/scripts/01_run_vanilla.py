@@ -15,6 +15,7 @@ LOCATION = "local"
 SAVE_OUTPUT = False
 PLOT = True
 
+
 # %%
 """
  
@@ -28,25 +29,24 @@ PLOT = True
  
 """
 
+# this is defined
+scanner_orientation = dict(rotation=0.0, invert_axis=[True, True, False])
+dims = ("Y", "X")
+
 one = ONE()
 # eid = one.ref2eid(dict(subject="SP058", date="2024-07-25", sequence="001"))
 eid = one.ref2eid(dict(subject="SP058", date="2024-08-01", sequence="001"))
 
 # load the reference image metadata
 ref_img_meta = ibl.load_reference_stack_metadata(eid, one, location=LOCATION)
-ref_point_mlap, ref_point_ref = ibl.load_reference_points_from_meta(
-    ref_img_meta, use_resolved=True
+ref_point = ibl.load_reference_points_from_meta(
+    ref_img_meta
 )  # the craniotomy center, both in ml,ap (histology resolved) and in
-# the reference space of scanimage (galvos)
 
 # load the suite2p data
 raw_imaging_meta, stat_paths, fov_map = ibl.load_fov_data(eid, one, location=LOCATION)
 fov_names = sorted(list(fov_map.keys()))
 coords_px = suite2p.data_loader(stat_paths, fov_map)  # refactor: rename coords_px
-
-# this is defined
-scanner_orientation = dict(rotation=0.0, invert_axis=[True, True, False])
-dims = ("Y", "X")
 
 # this is the atlas to project onto
 atlas = ProjectionAtlas(res_um=50)
@@ -77,7 +77,7 @@ coordinate_systems_2d = scanimage.create_coordinate_systems_from_scanimage_meta(
 # this gets the dv component for the ref point, as well as the brain normal at that
 # location
 ref_point_mlapdv, brain_normal_at_ref = atlas.get_plane_at_point_mlap(
-    *ref_point_mlap,
+    *ref_point["mlap"],
     numba=True,
 )
 

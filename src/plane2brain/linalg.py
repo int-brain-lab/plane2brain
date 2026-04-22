@@ -9,7 +9,7 @@ from numpy import linalg
 import numba as nb
 
 
-@nb.njit("Tuple((float64[:], float64[:]))(float64[:,:])")
+@nb.njit("Tuple((float64[:], float64[:]))(float64[:,:])", cache=True)
 def plane_normal_form(face: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """form a plane from a face (=3 points)
 
@@ -71,7 +71,7 @@ def intersect_line_plane(
         return l0 + d * l
 
 
-@nb.njit("float64[:](float64[:],float64[:],float64[:],float64[:])")
+@nb.njit("float64[:](float64[:],float64[:],float64[:],float64[:])", cache=True)
 def intersect_line_plane_nb(
     l0: np.ndarray,
     l: np.ndarray,
@@ -89,7 +89,7 @@ def intersect_line_plane_nb(
     return l0 + d * l
 
 
-@nb.njit("bool_(float64[:,:], float64[:])")
+@nb.njit("bool_(float64[:,:], float64[:])", cache=True)
 def point_in_face(
     face: np.ndarray,
     point: np.ndarray,
@@ -174,7 +174,7 @@ def intersect_line_mesh_np(
     )
 
 
-@nb.njit("float64(float64[:],float64[:])")
+@nb.njit("float64(float64[:],float64[:])", cache=True)
 def get_angle(a, b):
     # the angle between two vectors a and b
     # to adress the performance warnings: ensure contiguous arrays
@@ -186,6 +186,7 @@ def get_angle(a, b):
 @nb.njit(
     "Tuple((float64[:,:,:], float64[:,:], int64[:]))(float64[:,:], int32[:,:], float64[:], float64[:])",
     parallel=True,
+    cache=True,
 )
 def intersect_line_mesh_nb(
     vertices: np.ndarray,
@@ -269,7 +270,7 @@ def find_closest_point_from_line_np(
 
 
 # numba compatible version
-@nb.njit("float64[:](float64[:,:], float64[:], float64[:])")
+@nb.njit("float64[:](float64[:,:], float64[:], float64[:])", cache=True)
 def find_closest_point_from_line_nb(
     points: np.ndarray,
     l0: np.ndarray,
@@ -294,7 +295,9 @@ def find_closest_point_from_line_nb(
     return point
 
 
-@nb.njit("float64[:,:](float64[:,:],float64[:,:],float64[:])", parallel=True)
+@nb.njit(
+    "float64[:,:](float64[:,:],float64[:,:],float64[:])", parallel=True, cache=True
+)
 def find_closest_points_on_surface(
     points_eval: np.ndarray,
     brain_surface_points: np.ndarray,

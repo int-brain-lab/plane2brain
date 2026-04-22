@@ -136,7 +136,7 @@ def create_coordinate_systems_from_scanimage_meta(
         # this will actually fail due to imprecision!
         # np.testing.assert_allclose(
         #     (T_p @ np.append(np.zeros(2), 1))[:-1], fov_topleft_ref, rtol=1e-3
-        # )  # not very high precision required here
+        # )
 
         # (T_p @ np.append(fov_size_px, 1))[:-1] - (T_p @ np.append(np.zeros(2), 1))[:-1]
         # T_a = np.array(scanimage_fov_meta["scanfields"]["affine"])
@@ -160,7 +160,7 @@ def create_coordinate_systems_from_scanimage_meta(
             fov_topleft_ref,
         )
 
-        # the image size assertion
+        # the image size assertion TODO put this into a test
         nptest.assert_array_almost_equal(
             coordinate_system.transform(fov_topleft_ref, "ref", "pixel"),
             np.zeros(2),

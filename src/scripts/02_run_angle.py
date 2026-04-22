@@ -1,4 +1,9 @@
 # %%
+%matplotlib qt5
+import matplotlib as mpl
+# mpl.rcParams['figure.dpi'] = 300
+
+# %%
 import numpy as np
 from plane2brain import plotters, projections, scanimage, suite2p, ibl
 from plane2brain.coordinate_systems import (
@@ -15,6 +20,7 @@ import matplotlib.pyplot as plt
 LOCATION = "local"
 SAVE_OUTPUT = False
 PLOT = True
+
 # %%
 """
  
@@ -28,28 +34,25 @@ PLOT = True
  
 """
 
+# this is defined
+scanner_orientation = dict(rotation=0.0, invert_axis=[True, True, False])
+dims = ("Y", "X")
+
 one = ONE()
 # eid = one.ref2eid(dict(subject="SP058", date="2024-07-25", sequence="001"))
 eid = one.ref2eid(dict(subject="SP058", date="2024-08-01", sequence="001"))
 
 # load the reference image metadata
 ref_img_meta = ibl.load_reference_stack_metadata(eid, one, location=LOCATION)
-ref_point_mlap, ref_point_ref = ibl.load_reference_points_from_meta(
-    ref_img_meta, use_resolved=True
-)  # the craniotomy center, both in ml,ap (histology resolved) and in
-# the reference space of scanimage (galvos)
+ref_point = ibl.load_reference_points_from_meta(ref_img_meta)  # the craniotomy center, both in ml,ap (histology resolved) and in
 
 # load the suite2p data
 raw_imaging_meta, stat_paths, fov_map = ibl.load_fov_data(eid, one, location=LOCATION)
 fov_names = sorted(list(fov_map.keys()))
 coords_px = suite2p.data_loader(stat_paths, fov_map)  # refactor: rename coords_px
 
-# this is defined
-scanner_orientation = dict(rotation=0.0, invert_axis=[True, True, False])
-
 # this is the atlas to project onto
 atlas = ProjectionAtlas(res_um=50)
-
 
 # %%
 """
@@ -82,10 +85,14 @@ um_per_px = scanimage.get_resolution_from_scanimage_meta(
     dims=dims,
 )
 ref_img_size_um = ref_img_size_px * um_per_px
-ref_img_topleft_um = ref_point_mlap - ref_img_size_um / 2
+
+# the center of the craniotomy is not always exactly at the center
+# of the image, we adjust for this here
+ref_point["mlap_adjusted"] = ref_point["mlap"] + ref_point["xy"] * um_per_px
+ref_img_topleft_um = ref_point['mlap_adjusted'] - ref_img_size_um / 2
 
 # inferring the the "virtual corner" of the reference stack image
-# in ref
+# in ref space
 ref_img_topleft_ref, ref_img_ref_per_px = ibl.infer_ref_stack_virtual_corner(
     ref_img_meta["rawScanImageMeta"],
     ref_img_size_px,
@@ -149,7 +156,7 @@ axes = plotters.plot_brain_surface_points(atlas.get_surface_points())
 
 # the coordinate systems
 ref_point_mlapdv, brain_normal_at_ref = atlas.get_plane_at_point_mlap(
-    *ref_point_mlap,
+    *ref_point['mlap_adjusted'],
     numba=True,
 )
 coordinate_systems_3d = setup_coordinate_systems_3d(
@@ -214,7 +221,7 @@ axes.set_aspect("equal")
 line_kwargs = dict(linestyle=":", lw=1, alpha=1, color="r")
 axes.axhline(0, **line_kwargs)
 axes.axvline(0, **line_kwargs)
-circle_center = ref_point_mlap[::-1]
+circle_center = ref_point['mlap_adjusted'][::-1]
 # circle_center = [0, 0]
 circle = plt.Circle(circle_center, 2500, fill=False, color="r")
 axes.add_patch(circle)
@@ -320,7 +327,7 @@ p_surface, n_surface, dv_avg = projections.get_brain_surface_normal(
 # this gets the dv component for the ref point, as well as the brain normal at that
 # location
 ref_point_mlapdv, brain_normal_at_ref = atlas.get_plane_at_point_mlap(
-    *ref_point_mlap,
+    *ref_point['mlap_adjusted'],
     numba=True,
 )
 
@@ -336,7 +343,7 @@ coordinate_systems_3d = setup_coordinate_systems_3d(
 # this requires a coordinate system for 3d
 optical_axis = (
     coordinate_systems_3d.transform(n_surface, "imaging_plane", "mlapdv")
-    - ref_point_mlapdv  # this translation part is only relevant for plotting purposes
+    - ref_point_mlapdv
 )
 
 # set up a new 3d coordinate system with the imaging plane, now adjusted by the difference
@@ -373,7 +380,7 @@ coords = projections.project_scanimage_fovs(
     coordinate_systems_3d_adjusted,
     atlas=atlas,
     projection_vector=optical_axis,  # now project along the optical axis
-    ds=20,
+    ds=5,
 )
 
 # extract depths
@@ -439,7 +446,61 @@ for name, uuid in fov_map.items():
    ###    ####  ######
 """
 
-# already interleaved above
+# plot them in 3d
+axes = plotters.plot_brain_surface_points(atlas.get_surface_points())
+coordinate_systems_3d.plot(axes=axes, color_by="axis", scale=500)
+coordinate_systems_3d_adjusted.plot(axes=axes, color_by="axis", scale=500)
+
+uuids = sorted(list(fov_map.values()))
+coordinate_systems_fovs = scanimage.create_coordinate_systems_from_scanimage_meta(
+    raw_imaging_meta["rawScanImageMeta"],
+    fov_uuids=uuids,
+    dims=dims,
+)
+edges = ["topleft", "topright", "bottomright", "bottomleft", "topleft"]
+
+for uuid, coordinate_system in coordinate_systems_fovs.items():
+    fov_meta = scanimage.get_fov_meta(raw_imaging_meta["rawScanImageMeta"], uuid)
+    fov_size_px = scanimage.get_scanfield_size_px(fov_meta, dims=dims)
+
+    corners = get_image_corners(fov_size_px, coordinate_system, to="um_global")
+    # the corners are expressed in the um global space and need to be
+    # transformed into the mlapdv space first
+    _corners = np.array([np.append(corners[e], 0) for e in edges])
+    _corners = coordinate_systems_3d_adjusted.transform(_corners, "imaging_plane", "mlapdv")
+    axes.plot(*_corners.T, lw=1, color="k", zorder=100)
+
+for name, uuid in fov_map.items():
+    axes.scatter(
+        *coords[uuid]["on_surface"].T,
+        c=coords[uuid]["atlas_rgba"] / 255,
+        s=5,
+        zorder=20,
+    )
+    axes.scatter(*coords[uuid]["reprojected"].T, c="k", s=5)
+
+# adding the ref img FOV
+corners = get_image_corners(ref_img_size_px, coordinate_systems_ref, to='um_global')
+_corners = np.array([np.append(corners[e], 0) for e in edges])
+_corners = coordinate_systems_3d_adjusted.transform(_corners, "imaging_plane", "mlapdv")
+axes.plot(*_corners.T, lw=1, color="k", zorder=100)
+
+# adding the craniotomy in the ref img
+def approx_circle(center, radius, n_segments=128):
+    cx, cy = center
+    angles = np.linspace(0.0, 2.0 * np.pi, n_segments + 1)
+    x = cx + radius * np.cos(angles)
+    y = cy + radius * np.sin(angles)
+    return np.vstack((x, y)).T  # shape (n_segments+1, 2)
+
+points = approx_circle((0,0), 2500)
+points = np.concatenate([points, np.zeros((points.shape[0],1))], axis=1)
+_points = coordinate_systems_3d_adjusted.transform(points, "imaging_plane", "mlapdv")
+axes.plot(*_points.T, lw=1, color="k", zorder=100)
+
+axes.set_xlabel('ML')
+axes.set_ylabel('AP')
+axes.set_zlabel('DV')
 
 # %%
 """
