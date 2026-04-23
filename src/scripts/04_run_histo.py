@@ -16,8 +16,9 @@ import skimage
 
 # %% whiterussian / local server base folder
 # BASE_FOLDER = Path("/mnt/s0/Data/Subjects")
-LOCATION = "local"
-SAVE_OUTPUT = False
+
+LOCATION = "server"
+SAVE_OUTPUT = True
 PLOT = False
 
 # %%
@@ -144,10 +145,12 @@ ref_sess_ref_stack_path = ibl.get_reference_stack_path(
 # meso_task.load_reference_stack()
 
 # %% load the data from a local source and use miles code to convert to mlap
-if LOCATION == 'local':
+if LOCATION == "local":
     ccf_idx = np.load("/home/georg/data_local/referenceImage.mlapdv.npy")
-elif LOCATION == 'server':
-    ccf_idx = np.load("/home/ibladmin/Documents/georg/data_local/referenceImage.mlapdv.npy")
+elif LOCATION == "server":
+    ccf_idx = np.load(
+        "/home/ibladmin/Documents/georg/data_local/referenceImage.mlapdv.npy"
+    )
 
 from iblatlas.atlas import MRITorontoAtlas
 
@@ -172,6 +175,7 @@ ref_transform = skimage.transform.EuclideanTransform(
 )
 # the translation part can be easily used to shift ROIs in um_global space
 session_shift_um = transform_params["translation"] * um_per_px
+session_shift_um = session_shift_um[::-1]
 # the rotation component is still needs to be worked out how to apply it
 
 # %% setting up the coordinate systems for the imaged fovs
@@ -242,8 +246,9 @@ for fov_name, uuid in fov_map.items():
     # is probably safe to leave it inas the shift will be 0, but just to be explicit
     if eid != eid_ref:
         coords_um_global = (
-            coords_um_global + session_shift_um
-        )  # TODO figure out if plus or minus
+            coords_um_global - session_shift_um
+        )  # TODO figure out if plus or minus AND if dimensions need to be swapped
+        #
     px = coordinate_systems_ref.transform(coords_um_global, "um_global", "pixel")
     # transform to ref
     cpx_i = interp_xy(smoothed, *px.T)
@@ -258,15 +263,14 @@ for fov_name, uuid in fov_map.items():
     plotters.plot_points(coords[uuid]["on_surface_histo"], axes=axes)
 
 # %% deal with this in a moment
-i,j = ref_img_size_px//2
-center_mlap = interp_xy(smoothed, i,j)
+i, j = ref_img_size_px // 2
+center_mlap = interp_xy(smoothed, i, j)
 ref_point["mlap_adjusted"] = center_mlap
 
 # additionally, if this is not the reference session:
 if eid != eid_ref:
     # TODO figure out if this is plus or minus
-    ref_point["mlap_adjusted"] = ref_point["mlap_adjusted"] + transform_params["translation"] * um_per_px
-
+    ref_point["mlap_adjusted"] = ref_point["mlap_adjusted"] - session_shift_um
 
 
 # %%
@@ -321,7 +325,7 @@ coords = projections.correct_coords_for_tilt_2d(
 # %% I have everything together to project downwards
 for uuid in list(coords.keys()):
     coords_reprojected = projections.project_down_from_surface(
-        coords_on_surface=coords[uuid]['on_surface_histo'],
+        coords_on_surface=coords[uuid]["on_surface_histo"],
         atlas=atlas,
         coords_depths=coords[uuid]["dv_below_surface"],
     )
@@ -329,22 +333,24 @@ for uuid in list(coords.keys()):
 
 
 # %% some quantification of differences
-for name, uuid in fov_map.items():
-    _coords = coords[uuid]["pixel"]
-    coords_um = coordinate_systems_2d[uuid].transform(_coords, "pixel", "um_global")
-    xy_min = np.min(coords_um - coords[uuid]["um_corrected"], axis=0)
-    xy_max = np.max(coords_um - coords[uuid]["um_corrected"], axis=0)
-    dv_min = np.min((dv_avg - fov_depths[uuid]) - coords[uuid]["dv_below_surface"])
-    dv_max = np.max((dv_avg - fov_depths[uuid]) - coords[uuid]["dv_below_surface"])
-    print(f"-- {name} --")
-    print(f"x: min/max {xy_min[0]:.2f}/{xy_max[0]:.2f}")
-    print(f"y: min/max {xy_min[1]:.2f}/{xy_max[1]:.2f}")
-    print(f"dv: min/max {dv_min:.2f}/{dv_max:.2f}")
-    print()
+# for name, uuid in fov_map.items():
+#     _coords = coords[uuid]["pixel"]
+#     coords_um = coordinate_systems_2d[uuid].transform(_coords, "pixel", "um_global")
+#     xy_min = np.min(coords_um - coords[uuid]["um_corrected"], axis=0)
+#     xy_max = np.max(coords_um - coords[uuid]["um_corrected"], axis=0)
+#     dv_min = np.min((dv_avg - fov_depths[uuid]) - coords[uuid]["dv_below_surface"])
+#     dv_max = np.max((dv_avg - fov_depths[uuid]) - coords[uuid]["dv_below_surface"])
+#     print(f"-- {name} --")
+#     print(f"x: min/max {xy_min[0]:.2f}/{xy_max[0]:.2f}")
+#     print(f"y: min/max {xy_min[1]:.2f}/{xy_max[1]:.2f}")
+#     print(f"dv: min/max {dv_min:.2f}/{dv_max:.2f}")
+#     print()
 
 # %% map anything mlapdv to brain area
 for name, uuid in fov_map.items():
-    ids, ix, rgba, acronym = atlas.get_labels_for_mlapdv(coords[uuid]["reprojected_histo"])
+    ids, ix, rgba, acronym = atlas.get_labels_for_mlapdv(
+        coords[uuid]["reprojected_histo"]
+    )
     coords[uuid]["atlas_rgba"] = rgba
     coords[uuid]["atlas_acronym"] = acronym
     coords[uuid]["atlas_id"] = ids
@@ -380,7 +386,7 @@ if SAVE_OUTPUT:
         coords_mlapdv = coords[uuid]["reprojected_histo"]
         # saving the updated coordinates
         np.save(
-            session_folder / "alf" / name / "mpciROIs.mlapdv_histo_projection.npy",
+            session_folder / "alf" / name / "mpciROIs.mlapdv_histo_projection_3.npy",
             coords_mlapdv,
         )
         # saving the atlas ids
@@ -389,7 +395,7 @@ if SAVE_OUTPUT:
             session_folder
             / "alf"
             / name
-            / "mpciROIs.brainLocationIds_ccf_2017_histo_projection.npy",
+            / "mpciROIs.brainLocationIds_ccf_2017_histo_projection_3.npy",
             atlas_ids,
         )
 
