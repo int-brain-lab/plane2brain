@@ -8,7 +8,7 @@ import numpy as np
 # this is "kind of" ibl specific
 def data_loader(
     stat_paths: Dict[str, Path],
-    fov_map: dict,
+    fov_map: Dict[str, str],
 ) -> Dict[str, np.ndarray]:
     coords = {}
     for fov_name, path in stat_paths.items():

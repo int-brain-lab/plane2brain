@@ -118,12 +118,12 @@ def setup_coordinate_systems_from_scanimage_meta(
 
 def project_scanimage_fovs(
     coords_px: Dict[str, np.ndarray],
-    coordinate_systems_2d,
-    coordinate_systems_3d,
+    coordinate_systems_2d: Dict[str, LinkedCoordinateSystems],
+    coordinate_systems_3d: LinkedCoordinateSystems,
     atlas: ProjectionAtlas,
     projection_vector: np.ndarray,
     ds: int = 1,
-) -> Dict[str, np.ndarray]:
+) -> Dict[str, Dict[str, np.ndarray]]:
     coords_projected = {}
     fov_uuids = sorted(list(coords_px.keys()))
     for fov_uuid in fov_uuids:
@@ -273,6 +273,7 @@ def reproject_coords(  # FIXME refactor
     atlas: ProjectionAtlas,
     projection_vector: np.ndarray,
 ) -> Dict[str, Dict[str, np.ndarray]]:
+
     for uuid in list(coords.keys()):
         coords_on_surface = project_coords_onto_atlas_surface(
             coords[uuid]["um_corrected"],

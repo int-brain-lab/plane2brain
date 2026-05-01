@@ -1,4 +1,4 @@
-from typing import Tuple, Dict
+from typing import Optional, Tuple, Dict
 import numpy as np
 from scipy.spatial import ConvexHull
 from plane2brain.linalg import (
@@ -13,31 +13,32 @@ from iblatlas.atlas import AllenAtlas
 class ProjectionAtlas(AllenAtlas):
     def __init__(self, *args, **kwargs):
         # FIXME TODO figure out how to properly subclass MRIToronto
-        # MRI toronto scaling
+        # Scaling factors to align the MRI Toronto atlas to Allen CCF space,
+        # derived empirically from the MRI->CCF affine transform.
         ML_SCALE = 0.952
-        DV_SCALE = 0.885  # multiplicative factor on DV dimension, determined from MRI->CCF transform
-        AP_SCALE = 1.031  # multiplicative factor on AP dimension
+        DV_SCALE = 0.885
+        AP_SCALE = 1.031
         kwargs["scaling"] = np.array([ML_SCALE, AP_SCALE, DV_SCALE])
-        self.mesh: Dict[str, np.ndarray] = None  # better put Optional here
+        self.mesh: Optional[Dict[str, np.ndarray]] = None
         super().__init__(*args, **kwargs)
         self.compute_surface()
         self.calculate_surface_triangulation()
 
-    def calculate_surface_triangulation(self) -> dict:
+    def calculate_surface_triangulation(self) -> None:
+        """Compute the convex hull of surface points and store as a triangle mesh in `self.mesh`."""
         points = self.get_surface_points(dropna=True)
         hull = ConvexHull(points)
         connectivity_list = hull.simplices
         self.mesh = dict(vertices=points, edges=connectivity_list)
 
-    def get_surface_points(self, dropna=True) -> np.ndarray:
-        """for a given atlas, return all points that are on the brain surface in um.
+    def get_surface_points(self, dropna: bool = True) -> np.ndarray:
+        """Return all brain surface points in micrometers.
 
         Args:
-            atlas (BrainAtlas): _description_
-            dropna (bool, optional): _description_. Defaults to True.
+            dropna: If True, drop rows where the DV surface value is NaN.
 
         Returns:
-            np.ndarray: the surface points with shape (N,3) in (ml,ap,dv)
+            Array of shape (N, 3) in (ml, ap, dv) order, in µm.
         """
 
         ap_grid, ml_grid = np.meshgrid(
@@ -56,23 +57,24 @@ class ProjectionAtlas(AllenAtlas):
 
     def get_plane_at_point_mlap(
         self,
-        ml: np.float64,
-        ap: np.float64,
-        upwards=True,
-        numba=False,  # eventually drop this
+        ml: float,
+        ap: float,
+        upwards: bool = True,
+        numba: bool = False,
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """for a given ml,ap coordinates, returns the plane on the brain surface
-        in normal form
+        """Return the brain surface plane in normal form at a given ML/AP location.
+
+        Casts a vertical ray downward from above the brain and finds its intersection
+        with the surface mesh.
 
         Args:
-            ml (np.float64): _description_
-            ap (np.float64): _description_
-            vertices (np.ndarray): _description_
-            connectivity_list (np.ndarray): _description_
-            upwards (bool, optional): enforce the normal pointing upwards. Defaults to True.
+            ml: Medial-lateral coordinate in µm.
+            ap: Anterior-posterior coordinate in µm.
+            upwards: If True, flip the normal so it points away from the brain (upwards).
+            numba: Use the Numba-accelerated mesh intersection. Defaults to False.
 
         Returns:
-            Tuple[np.ndarray, np.ndarray]: plane as defined by point and normal
+            Tuple of (point on surface, surface normal), each of shape (3,) in µm.
         """
         # projects from a point above the brain downwards until it intersects
         # the mesh
@@ -95,7 +97,14 @@ class ProjectionAtlas(AllenAtlas):
         self,
         coords_mlap: np.ndarray,
     ) -> np.ndarray:
-        # for mlap coordinates, complete to mlapdv by getting the dv from the atlas
+        """Complete ML/AP coordinates to ML/AP/DV by projecting onto the surface mesh.
+
+        Args:
+            coords_mlap: Array of shape (N, 2) in µm.
+
+        Returns:
+            Array of shape (N, 3) in µm, with DV filled from the surface mesh.
+        """
         coords_mlapdv = np.zeros((coords_mlap.shape[0], 3))
         for i, _coords in enumerate(coords_mlap):
             _coords = np.append(_coords, 0.0)
@@ -117,7 +126,16 @@ class ProjectionAtlas(AllenAtlas):
     def get_labels_for_mlapdv(
         self,
         coords_mlapdv: np.ndarray,
-    ):
+    ) -> Tuple[np.ndarray, list, np.ndarray, np.ndarray]:
+        """Look up Allen Atlas region labels for a set of ML/AP/DV coordinates.
+
+        Args:
+            coords_mlapdv: Array of shape (N, 3) in µm.
+
+        Returns:
+            Tuple of (region IDs, region indices, RGBA colours, acronyms).
+            Currently uses the default Allen mapping; beryl/cosmos mappings not yet supported.
+        """
         # TODO choose mapping allen, beryl, cosmos etc
         ids = np.array(
             [self.get_labels(mlapdv / 1e6, mode="clip") for mlapdv in coords_mlapdv],

@@ -9,10 +9,11 @@ import subprocess
 from plane2brain import scanimage
 from one.api import ONE
 
+# Server-side data root — machine-specific, only used when location="server"
 BASE_FOLDER = Path("/mnt/s0/Data/Subjects")
 
 
-def _eid2path(eid: str, one: ONE, location="server"):
+def _eid2path(eid: str, one: ONE, location: str = "server") -> Path:
     if location == "server":
         session_path = BASE_FOLDER / one.eid2path(eid).session_path_short()
     else:
@@ -24,8 +25,8 @@ def load_fov_data(
     eid: str,
     one: ONE,
     raw_imaging_collection: Optional[str] = None,
-    location="server",
-):
+    location: str = "server",
+) -> Tuple[dict, Dict[str, Path], Dict[str, str]]:
     # get data
     if raw_imaging_collection is None:
         raw_imaging_collection = infer_imaging_collection(eid, one, location=location)
@@ -90,7 +91,7 @@ def get_reference_stack_path(
     one: ONE,
     raw_imaging_collection: Optional[str] = None,
     location: str = "server",
-) -> np.ndarray:
+) -> Path:
     if raw_imaging_collection is None:
         raw_imaging_collection = infer_imaging_collection(eid, one, location=location)
     session_path = _eid2path(eid, one, location=location)
@@ -119,10 +120,15 @@ def load_reference_stack(
     raw_imaging_collection: Optional[str] = None,
     location: str = "server",
 ) -> np.ndarray:
+    """Load the reference image stack for a session.
+
+    Returns:
+        Array of shape (dv, ml, ap).
+    """
     if raw_imaging_collection is None:
         raw_imaging_collection = infer_imaging_collection(eid, one, location=location)
     filepath = get_reference_stack_path(eid, one, location=location)
-    return tifffile.imread(filepath)  # (dv, ml, ap)
+    return tifffile.imread(filepath)
 
 
 def load_reference_stack_metadata(
@@ -130,7 +136,7 @@ def load_reference_stack_metadata(
     one: ONE,
     raw_imaging_collection: Optional[str] = None,
     location: str = "server",
-) -> Tuple[Dict, np.ndarray, np.ndarray]:
+) -> dict:
     # get the coordinates of the reference point
     if raw_imaging_collection is None:
         raw_imaging_collection = infer_imaging_collection(eid, one, location=location)
@@ -175,7 +181,14 @@ def load_reference_points_from_meta(
     return ref_point
 
 
-## get miles load reference stack function
+def load_reference_stack_miles(
+    eid: str,
+    one: ONE,
+    raw_imaging_collection: Optional[str] = None,
+    location: str = "server",
+) -> np.ndarray:
+    """Load reference stack using Miles' loader. Not yet implemented."""
+    raise NotImplementedError
 
 
 def infer_imaging_collection(eid: str, one: ONE, location="server") -> str:
@@ -311,8 +324,8 @@ def load_roi_mlapdv(
 def infer_ref_stack_virtual_corner(
     ref_img_scanimage_meta: dict,
     ref_img_size_px: np.ndarray,  # in 2d (X,Y)
-    dims: Tuple = ("X", "Y"),
-):
+    dims: Tuple[str, str] = ("X", "Y"),
+) -> Tuple[np.ndarray, np.ndarray]:
     # get the corner of the reference stack in ref space
     # TODO refactor me
     stripes = ref_img_scanimage_meta["Artist"]["RoiGroups"]["imagingRoiGroup"]["rois"]

@@ -320,7 +320,7 @@ def get_rotation_between_vectors(
     a: np.ndarray,
     b: np.ndarray,
     as_affine: bool = True,
-):
+) -> np.ndarray:
     # returns the (3,3) transform or (4,4)
     # https://math.stackexchange.com/a/2470436
 
@@ -345,7 +345,7 @@ def get_rotation_between_vectors(
 def get_vector_angles(
     v: np.ndarray,
     in_radians: bool = True,
-):
+) -> np.ndarray:
     # follows IBL conventions?
     # TODO verify the angles, again ...
 

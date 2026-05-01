@@ -6,9 +6,9 @@ import numpy as np
 
 
 def translation_matrix(
-    tx: np.float64,
-    ty: np.float64,
-    tz: np.float64,
+    tx: float,
+    ty: float,
+    tz: float,
 ) -> np.ndarray:
     matrix = [
         [1, 0, 0, tx],
@@ -21,9 +21,9 @@ def translation_matrix(
 
 
 def scaling_matrix(
-    sx: np.float64,
-    sy: np.float64,
-    sz: np.float64,
+    sx: float,
+    sy: float,
+    sz: float,
 ) -> np.ndarray:
     matrix = [
         [sx, 0, 0, 0],
@@ -35,7 +35,7 @@ def scaling_matrix(
 
 
 def rotation_matrix_x(
-    alpha: np.float64,
+    alpha: float,
     in_degrees: bool = False,
 ) -> np.ndarray:
     # pitch
@@ -53,7 +53,7 @@ def rotation_matrix_x(
 
 
 def rotation_matrix_y(
-    beta: np.float64,
+    beta: float,
     in_degrees: bool = False,
 ) -> np.ndarray:
     # roll
@@ -71,7 +71,7 @@ def rotation_matrix_y(
 
 
 def rotation_matrix_z(
-    gamma: np.float64,
+    gamma: float,
     in_degrees: bool = False,
 ) -> np.ndarray:
     # yaw
@@ -89,9 +89,9 @@ def rotation_matrix_z(
 
 
 def rotation_matrix(
-    alpha: np.float64,
-    beta: np.float64,
-    gamma: np.float64,
+    alpha: float,
+    beta: float,
+    gamma: float,
 ) -> np.ndarray:
     return rotation_matrix_x(alpha) @ rotation_matrix_y(beta) @ rotation_matrix_z(gamma)
 

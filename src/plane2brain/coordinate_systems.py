@@ -51,11 +51,11 @@ class CoordinateSystem:
         self.basis /= linalg.norm(self.basis, axis=0)[np.newaxis, :]
 
     def inverse_transform(self, points: np.ndarray) -> np.ndarray:
-        # from this coordinate system to world frame
+        """Map points from this coordinate system to the world frame."""
         return points @ self.basis.T + self.origin
 
     def transform(self, points_w: np.ndarray) -> np.ndarray:
-        # from world frame to this coordinate system
+        """Map points from the world frame into this coordinate system."""
         return (points_w - self.origin) @ linalg.pinv(self.basis.T)
 
     def plot(
