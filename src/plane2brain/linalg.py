@@ -11,13 +11,13 @@ import numba as nb
 
 @nb.njit("Tuple((float64[:], float64[:]))(float64[:,:])", cache=True)
 def plane_normal_form(face: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-    """form a plane from a face (=3 points)
+    """Form a plane from a face (3 points).
 
     Args:
-        face (np.ndarray): a (3,3) array, dim1 = xyz
+        face: Array of shape (3, 3), rows are the three vertices in xyz.
 
     Returns:
-        Tuple[np.ndarray, np.ndarray]: a tuple of the plane in normal form. p0 = point on plane, n = normal
+        Tuple of (p0, n): p0 is a point on the plane, n is the unit normal.
     """
 
     p0, p1, p2 = face
@@ -34,7 +34,7 @@ def intersect_line_plane(
     n: np.ndarray,
     warn: bool = True,
 ) -> np.ndarray:
-    """return the intersection point of a line defined by l0 and l and plane in normal form p0 and n.
+    """Return the intersection point of a line and a plane in normal form.
 
     derivation: https://en.wikipedia.org/wiki/Line%E2%80%93plane_intersection
 
@@ -44,18 +44,18 @@ def intersect_line_plane(
     ((l0 + d * l) - p0).n = 0
 
     Note:
-    this function works in numpy, as if this fails ( = no intersection point) a warning is raised
-    numba fails with ZeroDivisionError which can not be caught and handled
+    this function works in numpy so that a division-by-zero (parallel line/plane)
+    raises a warning rather than crashing silently as in the numba version.
 
     Args:
-        l0 (np.ndarray): point on line
-        l (np.ndarray): line vector
-        p0 (np.ndarray): point on plane
-        n (np.ndarray): plane normal
-        warn (bool, optional): warn or not. Defaults to True.
+        l0: Point on the line, shape (3,).
+        l: Line direction vector, shape (3,).
+        p0: Point on the plane, shape (3,).
+        n: Plane normal vector, shape (3,).
+        warn: If True, print a warning when division by zero occurs.
 
     Returns:
-        np.ndarray: the intersection point
+        The intersection point, shape (3,).
     """
     #
 
@@ -78,7 +78,12 @@ def intersect_line_plane_nb(
     p0: np.ndarray,
     n: np.ndarray,
 ) -> np.ndarray:
-    """see intersect_line_plane() docstring"""
+    """Numba JIT version of intersect_line_plane().
+
+    Unlike the NumPy version, a parallel line/plane raises ZeroDivisionError
+    which cannot be caught inside Numba. Only call this when an intersection
+    is guaranteed to exist.
+    """
     l0 = np.ascontiguousarray(l0)
     l = np.ascontiguousarray(l)
     p0 = np.ascontiguousarray(p0)
@@ -94,17 +99,17 @@ def point_in_face(
     face: np.ndarray,
     point: np.ndarray,
 ) -> np.bool_:
-    """check if the point is within the triangular face
+    """Check if a point lies within a triangular face.
 
-    3d form, barycentric coordinate based
+    3d form, barycentric coordinate based:
     https://math.stackexchange.com/questions/2582202/does-a-3d-point-lie-on-a-triangular-plane
 
     Args:
-        face (np.ndarray): a (3,3) array
-        point (np.ndarray): a (3,1) array
+        face: Array of shape (3, 3), rows are the three vertices.
+        point: Array of shape (3,).
 
     Returns:
-        np.bool_: True if point in face
+        True if the point lies within the face.
     """
 
     ph = np.append(point, 1)
@@ -118,7 +123,7 @@ def point_in_face_np(
     face: np.ndarray,
     point: np.ndarray,
 ) -> np.bool_:
-    """see docstring of point_in_face() , numpy version"""
+    """NumPy version of point_in_face()."""
     ph = np.concatenate([point, np.ones(1)])[:, np.newaxis]
     A = np.concatenate([face.T, np.ones(3)[np.newaxis, :]], axis=0)
     w = linalg.pinv(A.T @ A) @ A.T @ ph
@@ -133,19 +138,21 @@ def intersect_line_mesh_np(
     numba: bool = False,
     exclude: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """calculates the intersection of a line with a mesh. Finds the intersected vertices,
-    their indices, and the intersection points
+    """Calculate the intersection of a line with a triangle mesh.
 
     Args:
-        vertices (np.ndarray): _description_
-        edges (np.ndarray): _description_
-        line_point (np.ndarray): _description_
-        line_vector (np.ndarray): _description_
-        numba (bool, optional): _description_. Defaults to False.
-        exclude (bool, optional): _description_. Defaults to False.
+        vertices: Mesh vertices, shape (V, 3).
+        edges: Triangle index array, shape (F, 3), indexing into `vertices`.
+        line_point: A point on the line, shape (3,).
+        line_vector: Line direction vector, shape (3,).
+        numba: If True, use the Numba-accelerated plane intersection.
+        exclude: If True, skip faces with a horizontal normal (normal[2] == 0).
 
     Returns:
-        Tuple[np.ndarray, np.ndarray, np.ndarray]: _description_
+        Tuple of (faces, intersection_points, indices):
+            faces: Intersected triangle vertices, shape (N, 3, 3).
+            intersection_points: Intersection coordinates, shape (N, 3).
+            indices: Indices into `edges` of the intersected faces, shape (N,).
     """
     # collect intersected faces, their intersection points, and their indices
     ix = []
@@ -237,15 +244,15 @@ def intersect_line_mesh_nb(
 def get_closest_face(
     faces: np.ndarray,
     point: np.ndarray,
-) -> Tuple[np.ndarray, np.ndarray]:
-    """find the face closest to the point. For this, face coordinates are averaged.
+) -> Tuple[np.ndarray, np.intp]:
+    """Find the face closest to a point by comparing face centroid distances.
 
     Args:
-        faces (np.ndarray): array of shape (N, 3, 3) for N faces
-        point (np.ndarray): array of shape (3,)
+        faces: Array of shape (N, 3, 3) for N triangular faces.
+        point: Query point, shape (3,).
 
     Returns:
-        Tuple[np.ndarray, np.ndarray]: the closest face and its index
+        Tuple of (closest face, its index in `faces`).
     """
     # calculate distance to all and get minimum
     dists = np.zeros(faces.shape[0], dtype="float64")
@@ -262,7 +269,7 @@ def find_closest_point_from_line_np(
     l0: np.ndarray,
     l: np.ndarray,
 ) -> np.ndarray:
-    """numpy variant of find_closest_point_from_line_nb"""
+    """NumPy version of find_closest_point_from_line_nb()."""
     ds = linalg.norm((l0 - points) - np.dot(l0 - points, l)[:, np.newaxis] * l, axis=1)
     point = points[np.argmin(ds)]
     return point
@@ -275,16 +282,15 @@ def find_closest_point_from_line_nb(
     l0: np.ndarray,
     l: np.ndarray,
 ) -> np.ndarray:
-    """for a given set of points, return the point that is closest to the line
-    (defined by a point and a vector)
+    """Return the point closest to a line from a set of candidate points.
 
     Args:
-        points (np.ndarray): the points to evaluate
-        l0 (np.ndarray): point on the line
-        l (np.ndarray): vector of the line
+        points: Candidate points, shape (N, 3).
+        l0: A point on the line, shape (3,).
+        l: Line direction vector, shape (3,).
 
     Returns:
-        np.ndarray: the closest point
+        The closest point, shape (3,).
     """
     l0 = np.ascontiguousarray(l0)
     l = np.ascontiguousarray(l)

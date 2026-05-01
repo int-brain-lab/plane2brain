@@ -137,7 +137,7 @@ def load_reference_stack_metadata(
     raw_imaging_collection: Optional[str] = None,
     location: str = "server",
 ) -> dict:
-    # get the coordinates of the reference point
+    # load the referenceImage.meta JSON file
     if raw_imaging_collection is None:
         raw_imaging_collection = infer_imaging_collection(eid, one, location=location)
     match location:

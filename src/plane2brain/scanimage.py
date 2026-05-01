@@ -27,6 +27,10 @@ def get_scanfield_size_ref(
         scanimage_fov_meta: A single FOV metadata block from ScanImage.
         dims: The axis order for the returned arrays. Use
             `(X, Y)` by default, or `(Y, X)` to swap axes.
+
+    Returns:
+        Tuple of (fov_size_ref, fov_center_ref), each a shape (2,) array in
+        reference space units, ordered according to `dims`.
     """
     fov_size_ref = np.array(scanimage_fov_meta["scanfields"]["sizeXY"])
     fov_center_ref = np.array(scanimage_fov_meta["scanfields"]["centerXY"])
@@ -148,7 +152,7 @@ def create_coordinate_systems_from_scanimage_meta(
         ref_per_px = fov_size_ref / fov_size_px
         px_per_ref = 1 / ref_per_px
 
-        # next wee need to know what is the size of a pixel in reference space?
+        # next we need to know what is the size of a pixel in reference space?
         um_per_ref = um_per_px * px_per_ref
         ref_per_um = 1 / um_per_ref
         fov_topleft_um = fov_topleft_ref * um_per_ref

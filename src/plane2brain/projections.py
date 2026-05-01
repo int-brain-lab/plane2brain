@@ -168,9 +168,20 @@ def get_brain_surface_normal(
     ref_img_meta: dict,
     coordinate_systems_ref: LinkedCoordinateSystems,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """from the reference points, calculate a plane that approximates the brain surface
-    and its normal. Additionally, returns the average depth of the three points that is
-    later used to adjust the apparent depth of a cell."""
+    """Calculate a plane approximating the brain surface from user-selected reference points.
+
+    Args:
+        reference_brain_surface_points: Dict with a "points" key, each entry
+            containing "stack_idx" and "coords" for a surface point.
+        ref_img_meta: Reference image metadata, used to extract stack plane DV positions.
+        coordinate_systems_ref: Coordinate systems for the reference image.
+
+    Returns:
+        Tuple of (p_surface, n_surface, dv_avg):
+            p_surface: A point on the fitted surface plane, shape (3,).
+            n_surface: Unit normal of the fitted plane, pointing upwards, shape (3,).
+            dv_avg: Average DV depth of the selected surface points in µm.
+    """
     # TODO decouple here:
     # IBL specific - this should be the loader, that also inverts the dimensions of the points
     # and scanimage specific
@@ -223,19 +234,25 @@ def correct_coords_for_tilt_2d(
     p_surface: np.ndarray,
     n_surface: np.ndarray,
 ) -> Dict[str, Dict[str, np.ndarray]]:
-    """when the brain surface is tilted to the optical axis the coordinates of
-    deeper planes shift relative to those at the surface. The extracted positions
-    of cells are a) shifted in x and y, and b) the depth of the plane is not the
-    true morphological depth of the cell beneath the surface
+    """Correct cell coordinates for the tilt between the brain surface and optical axis.
 
-    to correct for this, we take the apparent location of the cell, and project
-    that point onto the brain surface (as determined by the reference points)
-    along the brain normal (likewise from the ref points)
+    When the brain surface is tilted relative to the optical axis, cells in
+    deeper imaging planes appear shifted in x/y, and the z-stack depth is not
+    the true morphological depth below the surface. This function projects each
+    cell's apparent 3D position onto the tilted brain surface plane along the
+    surface normal, yielding corrected ML/AP coordinates and true DV depth.
 
-    this yields: the corrected ml and ap coordinates
-    the distance to the plane is the true dv depth
+    Adds "um_corrected" and "dv_below_surface" keys to each FOV entry in `coords`.
 
-    NOTE this adds to the multi fov coords dict
+    Args:
+        coords: Per-FOV dict mapping UUID to coordinate arrays (must contain "um_global").
+        fov_depths: Mapping from FOV UUID to imaging depth in µm.
+        p_surface: A point on the brain surface plane, shape (3,).
+        n_surface: Unit normal of the brain surface plane, shape (3,).
+
+    Returns:
+        The same `coords` dict, updated in-place with "um_corrected" and
+        "dv_below_surface" entries per FOV.
     """
 
     for uuid in list(coords.keys()):
