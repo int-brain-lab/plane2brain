@@ -108,10 +108,6 @@ class LinkedCoordinateSystems:
         self.coordinate_systems = coordinate_systems
         # all have the same dim
         assert len(set([cs.dim for cs in self.coordinate_systems.values()])) == 1
-        # no duplicate names
-        assert len(set([name for name in self.coordinate_systems.keys()])) == len(
-            self.coordinate_systems
-        )
         self.dim = next(iter(self.coordinate_systems.values())).dim
 
     def transform(
@@ -228,7 +224,6 @@ def create_coordinate_system_for_image(
         ref_per_px: Pixel size in reference units, shape `(2,)`.
         img_topleft_ref: Top-left image corner in the reference frame,
             shape `(2,)`.
-        verify: If true, validate coordinate relationships with assertions.
 
     Returns:
         A `LinkedCoordinateSystems` object for the image, pixel, um_image,
@@ -341,7 +336,7 @@ def coordinate_system_from_normal(
     ap_, dv_ = r * np.cos(phi), r * np.sin(phi)
 
     dv_v = n
-    ap_v = np.array([0, ap_, dv_])  # this is the 0 ML constrain
+    ap_v = np.array([0, ap_, dv_])  # this is the 0 ML constraint
     ml_v = np.cross(ap_v, dv_v)
 
     # normalize

@@ -40,7 +40,7 @@ def intersect_line_plane(
 
     point on line is p = l0 + d * l
     point on plane is (p - p0).n = 0
-    subsitute and solve for d
+    substitute and solve for d
     ((l0 + d * l) - p0).n = 0
 
     Note:
@@ -96,7 +96,7 @@ def point_in_face(
 ) -> np.bool_:
     """check if the point is within the triangular face
 
-    3d form, baycentric coorinate based
+    3d form, barycentric coordinate based
     https://math.stackexchange.com/questions/2582202/does-a-3d-point-lie-on-a-triangular-plane
 
     Args:
@@ -147,7 +147,7 @@ def intersect_line_mesh_np(
     Returns:
         Tuple[np.ndarray, np.ndarray, np.ndarray]: _description_
     """
-    # returns the index of the intersected faces
+    # collect intersected faces, their intersection points, and their indices
     ix = []
     faces = []
     intersection_points = []
@@ -177,7 +177,7 @@ def intersect_line_mesh_np(
 @nb.njit("float64(float64[:],float64[:])", cache=True)
 def get_angle(a, b):
     # the angle between two vectors a and b
-    # to adress the performance warnings: ensure contiguous arrays
+    # to address the performance warnings: ensure contiguous arrays
     a = np.ascontiguousarray(a)
     b = np.ascontiguousarray(b)
     return np.arccos(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
@@ -201,11 +201,10 @@ def intersect_line_mesh_nb(
     for i in nb.prange(N):
         face = vertices[edges[i]]
         plane_point, plane_normal = plane_normal_form(face)
-        # test if plane normal and line vector are parallel
-        # if not, they will have an intersection point
+        # if plane normal and line vector are perpendicular, the line is parallel
+        # to the plane and there is no intersection — skip those faces
         tol = 1e-5
         alpha = get_angle(plane_normal, line_vector)
-        # exclude faces that will not be intersected
         if np.abs((np.abs(alpha) - np.pi / 2)) > tol:
             face = vertices[edges[i]]
             plane_point, plane_normal = plane_normal_form(face)
@@ -246,7 +245,7 @@ def get_closest_face(
         point (np.ndarray): array of shape (3,)
 
     Returns:
-        Tuple[np.ndarray, np.ndarray]: the closest face and it's index
+        Tuple[np.ndarray, np.ndarray]: the closest face and its index
     """
     # calculate distance to all and get minimum
     dists = np.zeros(faces.shape[0], dtype="float64")
@@ -305,7 +304,7 @@ def find_closest_points_on_surface(
 ) -> np.ndarray:
     # TODO this needs heavy refactoring
     # rename into: find_closest_point_from_lines
-    # as this is essentially a parallelizatoin wrapper find_closest_point_from_line_nb
+    # as this is essentially a parallelization wrapper find_closest_point_from_line_nb
     # change the call signature accordingly
     N = points_eval.shape[0]
     points_closest = np.zeros((N, 3))

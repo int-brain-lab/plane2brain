@@ -269,7 +269,7 @@ def load_brain_surface_points(
                     / "referenceImage.points.json"
                 )
                 if not local_path.exists():  # attempt to copy
-                    cmd = f"scp -v mbox-whiterussian:{remote_path} {local_path}"  # This only work with my own SSH setup and is throwaway code ...
+                    cmd = f"scp -v mbox-whiterussian:{remote_path} {local_path}"  # This only works with my own SSH setup and is throwaway code ...
                     res = subprocess.run(
                         cmd, shell=True, capture_output=True, text=True
                     )
@@ -315,7 +315,7 @@ def load_roi_mlapdv(
             if f"alf/{fov}/{dataset}" in datasets:
                 mlapdv = one.load_dataset(eid, dataset, collection=f"alf/{fov}")
             else:
-                # dataset it not available via one
+                # dataset is not available via one
                 # make a general copy dataset function from the scraps above
                 raise NotImplementedError
     return mlapdv

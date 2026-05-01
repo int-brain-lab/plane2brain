@@ -40,18 +40,18 @@ def project_coords_onto_atlas_surface(
     atlas: ProjectionAtlas,
     projection_vector: np.ndarray,  # project along this axis. Positive is defined to point away from the brain surface
 ) -> np.ndarray:
-    # coordinate_systems_3d needs to contain imaging plane and mlapv
-    assert [
+    # coordinate_systems_3d needs to contain imaging_plane and mlapdv
+    assert all(
         key in coordinate_systems_3d.coordinate_systems.keys()
         for key in ["imaging_plane", "mlapdv"]
-    ]
+    )
 
     # in um in the imaging plane
     coords_um_ = np.concatenate([coords_um, np.zeros((coords_um.shape[0], 1))], axis=1)
     coords_on_imaging_plane = coordinate_systems_3d.transform(
         coords_um_, "imaging_plane", "mlapdv"
     )
-    # project the rois onto the brain surface along the brain normal
+    # project the rois onto the brain surface along the projection vector
     coords_on_surface = np.zeros_like(coords_on_imaging_plane)
     for i, _coords in enumerate(
         tqdm(coords_on_imaging_plane, desc="projecting on surface")
@@ -82,7 +82,7 @@ def project_down_from_surface(
         p, n = atlas.get_plane_at_point_mlap(point[0], point[1], numba=True)
         coords_mlapdv[i] = (
             p + n * -1 * coords_depths[i]
-        )  # either depth of the imaging plane
+        )  # step inward from the surface along the inverted normal by the cell depth
 
     return coords_mlapdv
 
@@ -95,7 +95,7 @@ def setup_coordinate_systems_from_scanimage_meta(
     fov_uuids: list[str],
 ) -> Tuple[LinkedCoordinateSystems, LinkedCoordinateSystems]:
     # and creating the coordinate system
-    # TODO integrate ref point 0,0 differnces
+    # TODO integrate ref point 0,0 differences
     # ref_point_mlap == craniotomy center
     ref_point_mlapdv, brain_normal_at_ref = atlas.get_plane_at_point_mlap(
         *common_point_mlap,
@@ -169,7 +169,7 @@ def get_brain_surface_normal(
     coordinate_systems_ref: LinkedCoordinateSystems,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """from the reference points, calculate a plane that approximates the brain surface
-    and it's normal. Additionally, returns the average depth of the three points that is
+    and its normal. Additionally, returns the average depth of the three points that is
     later used to adjust the apparent depth of a cell."""
     # TODO decouple here:
     # IBL specific - this should be the loader, that also inverts the dimensions of the points
@@ -209,7 +209,7 @@ def get_brain_surface_normal(
         [brain_surface_points_rel_um, ref_points_dv[:, np.newaxis]], axis=1
     )
     p_surface, n_surface = plane_normal_form(brain_surface_points_rel_um_3d)
-    # invert if pointing downards
+    # invert if pointing downwards
     if n_surface[2] < 0:
         n_surface *= -1
 
@@ -223,14 +223,14 @@ def correct_coords_for_tilt_2d(
     p_surface: np.ndarray,
     n_surface: np.ndarray,
 ) -> Dict[str, Dict[str, np.ndarray]]:
-    """when the bain surface is tilted to the optical axis the coordinates of
+    """when the brain surface is tilted to the optical axis the coordinates of
     deeper planes shift relative to those at the surface. The extracted positions
     of cells are a) shifted in x and y, and b) the depth of the plane is not the
     true morphological depth of the cell beneath the surface
 
     to correct for this, we take the apparent location of the cell, and project
-    that point onto the the brain surface (as determined by the reference points)
-    along the brain normal (likewise form the ref points)
+    that point onto the brain surface (as determined by the reference points)
+    along the brain normal (likewise from the ref points)
 
     this yields: the corrected ml and ap coordinates
     the distance to the plane is the true dv depth
