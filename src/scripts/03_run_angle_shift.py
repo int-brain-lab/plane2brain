@@ -1,4 +1,5 @@
 # %%
+import sys
 import numpy as np
 from plane2brain import plotters, projections, scanimage, suite2p, ibl
 from plane2brain.coordinate_systems import (
@@ -15,9 +16,10 @@ import skimage
 
 # %% whiterussian / local server base folder
 # BASE_FOLDER = Path("/mnt/s0/Data/Subjects")
-LOCATION = "local"
+LOCATION = "server"
 SAVE_OUTPUT = False
-PLOT = True
+PLOT = False
+
 # %%
 """
  
@@ -37,7 +39,9 @@ dims = ("Y", "X")
 
 one = ONE()
 # eid = one.ref2eid(dict(subject="SP058", date="2024-07-25", sequence="001"))
-eid = one.ref2eid(dict(subject="SP058", date="2024-08-01", sequence="001"))
+# eid = one.ref2eid(dict(subject="SP058", date="2024-08-01", sequence="001"))
+session_path = sys.argv[1]
+eid = one.path2eid(session_path)
 
 # load the reference image metadata
 ref_img_meta = ibl.load_reference_stack_metadata(eid, one, location=LOCATION)
@@ -143,7 +147,7 @@ ref_transform = skimage.transform.EuclideanTransform(
 )
 
 ref_point["mlap_adjusted_shifted"] = (
-    ref_point["mlap_adjusted"] + transform_params["translation"] * um_per_px
+    ref_point["mlap_adjusted"] - transform_params["translation"] * um_per_px
 )
 
 
@@ -444,14 +448,48 @@ coordinate_systems_2d = scanimage.create_coordinate_systems_from_scanimage_meta(
     dims=dims,
 )
 
-coords = projections.project_scanimage_fovs(
-    coords_px,  # the pixel coordinates as loaded from suite2p
-    coordinate_systems_2d,
-    coordinate_systems_3d_adjusted,
-    atlas=atlas,
-    projection_vector=optical_axis,  # now project along the optical axis
-    ds=20,
-)
+# break this function apart to apply the transform
+# coords = projections.project_scanimage_fovs(
+#     coords_px,  # the pixel coordinates as loaded from suite2p
+#     coordinate_systems_2d,
+#     coordinate_systems_3d_adjusted,
+#     atlas=atlas,
+#     projection_vector=optical_axis,  # now project along the optical axis
+#     ds=20,
+# )
+
+# setting up coords dict
+coords = {}
+fov_uuids = sorted(list(coords_px.keys()))
+for fov_uuid in fov_uuids:
+    coords[fov_uuid] = {}
+    # get the pixel data
+    _coords_px = coords_px[fov_uuid]
+    # project into global um space
+    _coords_um = coordinate_systems_2d[fov_uuid].transform(
+        _coords_px,
+        "pixel",
+        "um_global",
+    )
+    coords[fov_uuid]["pixel"] = _coords_px
+    coords[fov_uuid]["um_global"] = _coords_um
+
+    # applying the transform between reference stack and reference session reference stack
+    px = coordinate_systems_ref.transform(_coords_um, "um_global", "pixel")
+    # transform to ref
+    if eid != eid_ref:
+        px = ref_transform(px)
+        _coords_um_corr = coordinate_systems_ref.transform(px, "pixel", "um_gobal")
+        coords[fov_uuid]["um_global_corrected"] = _coords_um_corr
+
+# project onto brain atlas
+for fov_uuid in fov_uuids:
+    coords[fov_uuid]["on_surface"] = projections.project_coords_onto_atlas_surface(
+        coords[fov_uuid]["um_global_corrected"],
+        coordinate_systems_3d_adjusted,
+        atlas=atlas,
+        projection_vector=optical_axis,
+    )
 
 # extract depths
 fov_uuids = sorted(list(fov_map.values()))
@@ -460,6 +498,7 @@ fov_depths = scanimage.extract_fov_depths_from_scanimage_meta(
     scanimage_params=raw_imaging_meta["scanImageParams"],
     fov_uuids=fov_uuids,
 )
+
 # this creates: the keys 'um_corrected' and 'dv_below_surface'
 coords = projections.correct_coords_for_tilt_2d(
     coords,
@@ -485,18 +524,18 @@ for uuid in list(coords.keys()):
 
 
 # %% some quantification of differences
-for name, uuid in fov_map.items():
-    _coords = coords[uuid]["pixel"]
-    coords_um = coordinate_systems_2d[uuid].transform(_coords, "pixel", "um_global")
-    xy_min = np.min(coords_um - coords[uuid]["um_corrected"], axis=0)
-    xy_max = np.max(coords_um - coords[uuid]["um_corrected"], axis=0)
-    dv_min = np.min((dv_avg - fov_depths[uuid]) - coords[uuid]["dv_below_surface"])
-    dv_max = np.max((dv_avg - fov_depths[uuid]) - coords[uuid]["dv_below_surface"])
-    print(f"-- {name} --")
-    print(f"x: min/max {xy_min[0]:.2f}/{xy_max[0]:.2f}")
-    print(f"y: min/max {xy_min[1]:.2f}/{xy_max[1]:.2f}")
-    print(f"dv: min/max {dv_min:.2f}/{dv_max:.2f}")
-    print()
+# for name, uuid in fov_map.items():
+#     _coords = coords[uuid]["pixel"]
+#     coords_um = coordinate_systems_2d[uuid].transform(_coords, "pixel", "um_global")
+#     xy_min = np.min(coords_um - coords[uuid]["um_corrected"], axis=0)
+#     xy_max = np.max(coords_um - coords[uuid]["um_corrected"], axis=0)
+#     dv_min = np.min((dv_avg - fov_depths[uuid]) - coords[uuid]["dv_below_surface"])
+#     dv_max = np.max((dv_avg - fov_depths[uuid]) - coords[uuid]["dv_below_surface"])
+#     print(f"-- {name} --")
+#     print(f"x: min/max {xy_min[0]:.2f}/{xy_max[0]:.2f}")
+#     print(f"y: min/max {xy_min[1]:.2f}/{xy_max[1]:.2f}")
+#     print(f"dv: min/max {dv_min:.2f}/{dv_max:.2f}")
+#     print()
 
 # %% map anything mlapdv to brain area
 for name, uuid in fov_map.items():

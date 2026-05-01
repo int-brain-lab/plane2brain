@@ -39,10 +39,13 @@ scanner_orientation = dict(rotation=0.0, invert_axis=[True, True, False])
 dims = ("Y", "X")
 
 one = ONE()
-# eid = one.ref2eid(dict(subject="SP058", date="2024-07-25", sequence="001"))
-# eid = one.ref2eid(dict(subject="SP058", date="2024-08-01", sequence="001"))
-session_path = sys.argv[1]
-eid = one.path2eid(session_path)
+if len(sys.argv) == 1:
+    # eid = one.ref2eid(dict(subject="SP058", date="2024-07-25", sequence="001"))
+    eid = one.ref2eid(dict(subject="SP058", date="2024-08-01", sequence="001"))
+    session_path = ibl._eid2path(eid, one, location=LOCATION)
+else:
+    session_path = sys.argv[1]
+    eid = one.path2eid(session_path)
 
 # load the reference image metadata
 ref_img_meta = ibl.load_reference_stack_metadata(eid, one, location=LOCATION)
@@ -175,8 +178,6 @@ ref_transform = skimage.transform.EuclideanTransform(
 )
 # the translation part can be easily used to shift ROIs in um_global space
 session_shift_um = transform_params["translation"] * um_per_px
-session_shift_um = session_shift_um[::-1]
-# the rotation component is still needs to be worked out how to apply it
 
 # %% setting up the coordinate systems for the imaged fovs
 fov_uuids = sorted(list(fov_map.values()))
@@ -192,6 +193,12 @@ ref_img_topleft_ref, ref_img_ref_per_px = ibl.infer_ref_stack_virtual_corner(
     dims=dims,
 )
 
+# attempt: shifting the topleft corner by the session shift
+session_shift_ref = transform_params["translation"] * ref_img_ref_per_px
+# the inversion of dimensions is necessary:
+#
+ref_img_topleft_ref = ref_img_topleft_ref + session_shift_ref[::-1]
+
 # the 2d coordinate system in of the reference image
 coordinate_systems_ref = create_coordinate_system_for_image(
     ref_img_size_px,
@@ -200,6 +207,18 @@ coordinate_systems_ref = create_coordinate_system_for_image(
     ref_img_topleft_ref,
 )
 
+# %% rotate the basis
+rotation = skimage.transform.EuclideanTransform(
+    rotation=transform_params["rotation"],
+)
+rotation = np.array(rotation)
+from plane2brain.affine import apply_transform
+
+for name in coordinate_systems_ref.coordinate_systems.keys():
+    basis = coordinate_systems_ref.coordinate_systems[name].basis
+    coordinate_systems_ref.coordinate_systems[name].basis = apply_transform(
+        basis, rotation
+    )
 
 # %% setting up coords dict
 coords = {}
@@ -234,6 +253,7 @@ def interp_xy(grid, ii, jj):
 
 # %%
 sigma = 25
+# sigma = 1
 grid = ref_img_histo_mlapdv[:, :, :-1]
 
 smoothed = gaussian_filter(grid.astype(float), sigma=(sigma, sigma, 0))
@@ -244,23 +264,16 @@ for fov_name, uuid in fov_map.items():
     # applies the per session shift as inferred by the transform betwen
     # not for the reference session
     # is probably safe to leave it inas the shift will be 0, but just to be explicit
-    if eid != eid_ref:
-        coords_um_global = (
-            coords_um_global - session_shift_um
-        )  # TODO figure out if plus or minus AND if dimensions need to be swapped
-        #
     px = coordinate_systems_ref.transform(coords_um_global, "um_global", "pixel")
-    # transform to ref
-    cpx_i = interp_xy(smoothed, *px.T)
     coords[uuid]["mlap_histo"] = interp_xy(smoothed, *px.T)
     # find point on surface
     coords[uuid]["on_surface_histo"] = atlas.get_dv_for_mlap(coords[uuid]["mlap_histo"])
 
 # %% some plotting
 # plot them in 3d
-axes = plotters.plot_brain_surface_points(atlas.get_surface_points())
-for fov_name, uuid in fov_map.items():
-    plotters.plot_points(coords[uuid]["on_surface_histo"], axes=axes)
+# axes = plotters.plot_brain_surface_points(atlas.get_surface_points())
+# for fov_name, uuid in fov_map.items():
+#     plotters.plot_points(coords[uuid]["on_surface_histo"], axes=axes)
 
 # %% deal with this in a moment
 i, j = ref_img_size_px // 2
@@ -270,7 +283,7 @@ ref_point["mlap_adjusted"] = center_mlap
 # additionally, if this is not the reference session:
 if eid != eid_ref:
     # TODO figure out if this is plus or minus
-    ref_point["mlap_adjusted"] = ref_point["mlap_adjusted"] - session_shift_um
+    ref_point["mlap_adjusted"] = ref_point["mlap_adjusted"] + session_shift_um
 
 
 # %%
@@ -312,6 +325,22 @@ coords = projections.correct_coords_for_tilt_2d(
 )
 
 # %%
+# scanimage_meta = raw_imaging_meta['rawScanImageMeta']
+# scanimage_params = raw_imaging_meta["scanImageParams"]
+# from plane2brain.scanimage import _get_fov_uuids, get_fov_meta
+# if fov_uuids is None:
+#     fov_uuids = _get_fov_uuids(scanimage_meta)
+# # extract the depth - a combination of the voicecoil (fast-z)
+# # and gantry position
+# # TODO VERIFY -> ask Krumin
+# # that this is the correct way how they are comined!
+# fastz_pos = scanimage_params["hFastZ"]["position"]
+# fov_depths = {}
+# for fov_uuid in fov_uuids:
+#     fov_meta = get_fov_meta(scanimage_meta, fov_uuid)
+#     fov_depths[fov_uuid] = -1 * (fastz_pos + fov_meta["zs"])
+
+# %%
 """
 ########  ########   #######        ## ########  ######  ######## ####  #######  ##    ##
 ##     ## ##     ## ##     ##       ## ##       ##    ##    ##     ##  ##     ## ###   ##
@@ -322,38 +351,38 @@ coords = projections.correct_coords_for_tilt_2d(
 ##        ##     ##  #######   ######  ########  ######     ##    ####  #######  ##    ##
 """
 
-# %% I have everything together to project downwards
-for uuid in list(coords.keys()):
-    coords_reprojected = projections.project_down_from_surface(
-        coords_on_surface=coords[uuid]["on_surface_histo"],
-        atlas=atlas,
-        coords_depths=coords[uuid]["dv_below_surface"],
-    )
-    coords[uuid]["reprojected_histo"] = coords_reprojected  # this is mlapdv
+if 1:
+    # %% I have everything together to project downwards
+    for uuid in list(coords.keys()):
+        coords_reprojected = projections.project_down_from_surface(
+            coords_on_surface=coords[uuid]["on_surface_histo"],
+            atlas=atlas,
+            coords_depths=coords[uuid]["dv_below_surface"],
+        )
+        coords[uuid]["reprojected_histo"] = coords_reprojected  # this is mlapdv
 
+    # %% some quantification of differences
+    # for name, uuid in fov_map.items():
+    #     _coords = coords[uuid]["pixel"]
+    #     coords_um = coordinate_systems_2d[uuid].transform(_coords, "pixel", "um_global")
+    #     xy_min = np.min(coords_um - coords[uuid]["um_corrected"], axis=0)
+    #     xy_max = np.max(coords_um - coords[uuid]["um_corrected"], axis=0)
+    #     dv_min = np.min((dv_avg - fov_depths[uuid]) - coords[uuid]["dv_below_surface"])
+    #     dv_max = np.max((dv_avg - fov_depths[uuid]) - coords[uuid]["dv_below_surface"])
+    #     print(f"-- {name} --")
+    #     print(f"x: min/max {xy_min[0]:.2f}/{xy_max[0]:.2f}")
+    #     print(f"y: min/max {xy_min[1]:.2f}/{xy_max[1]:.2f}")
+    #     print(f"dv: min/max {dv_min:.2f}/{dv_max:.2f}")
+    #     print()
 
-# %% some quantification of differences
-# for name, uuid in fov_map.items():
-#     _coords = coords[uuid]["pixel"]
-#     coords_um = coordinate_systems_2d[uuid].transform(_coords, "pixel", "um_global")
-#     xy_min = np.min(coords_um - coords[uuid]["um_corrected"], axis=0)
-#     xy_max = np.max(coords_um - coords[uuid]["um_corrected"], axis=0)
-#     dv_min = np.min((dv_avg - fov_depths[uuid]) - coords[uuid]["dv_below_surface"])
-#     dv_max = np.max((dv_avg - fov_depths[uuid]) - coords[uuid]["dv_below_surface"])
-#     print(f"-- {name} --")
-#     print(f"x: min/max {xy_min[0]:.2f}/{xy_max[0]:.2f}")
-#     print(f"y: min/max {xy_min[1]:.2f}/{xy_max[1]:.2f}")
-#     print(f"dv: min/max {dv_min:.2f}/{dv_max:.2f}")
-#     print()
-
-# %% map anything mlapdv to brain area
-for name, uuid in fov_map.items():
-    ids, ix, rgba, acronym = atlas.get_labels_for_mlapdv(
-        coords[uuid]["reprojected_histo"]
-    )
-    coords[uuid]["atlas_rgba"] = rgba
-    coords[uuid]["atlas_acronym"] = acronym
-    coords[uuid]["atlas_id"] = ids
+    # %% map anything mlapdv to brain area
+    for name, uuid in fov_map.items():
+        ids, ix, rgba, acronym = atlas.get_labels_for_mlapdv(
+            coords[uuid]["reprojected_histo"]
+        )
+        coords[uuid]["atlas_rgba"] = rgba
+        coords[uuid]["atlas_acronym"] = acronym
+        coords[uuid]["atlas_id"] = ids
 
 # %%
 """
@@ -380,23 +409,45 @@ for name, uuid in fov_map.items():
   ######  ##     ##    ###    ########     #######   #######     ##    ##         #######     ##    
  
 """
+import pickle
+
 if SAVE_OUTPUT:
     for name, uuid in fov_map.items():
         session_folder = ibl._eid2path(eid, one, location=LOCATION)
-        coords_mlapdv = coords[uuid]["reprojected_histo"]
-        # saving the updated coordinates
-        np.save(
-            session_folder / "alf" / name / "mpciROIs.mlapdv_histo_projection_3.npy",
-            coords_mlapdv,
-        )
-        # saving the atlas ids
-        atlas_ids = atlas.get_labels_for_mlapdv(coords_mlapdv)[0]
+        # coords_mlapdv = coords[uuid]["reprojected_histo"]
         np.save(
             session_folder
             / "alf"
             / name
-            / "mpciROIs.brainLocationIds_ccf_2017_histo_projection_3.npy",
-            atlas_ids,
+            / "mpciROIs.mlapdv_histo_projection_mlapdv_2.npy",
+            coords[uuid]["reprojected_histo"],
         )
+        np.save(
+            session_folder
+            / "alf"
+            / name
+            / "mpciROIs.mlapdv_histo_projection_surface_2.npy",
+            coords[uuid]["on_surface_histo"],
+        )
+
+        # coords_mlapdv = np.concatenate(
+        #     [
+        #         coords[uuid]["on_surface_histo"],
+        #         np.zeros((coords[uuid]["mlap_histo"].shape[0], 1)),
+        #     ],
+        #     axis=1,
+        # )
+
+        # saving the updated coordinates
+
+        # saving the atlas ids
+        # atlas_ids = atlas.get_labels_for_mlapdv(coords_mlapdv)[0]
+        # np.save(
+        #     session_folder
+        #     / "alf"
+        #     / name
+        #     / "mpciROIs.brainLocationIds_ccf_2017_histo_projection_4.npy",
+        #     atlas_ids,
+        # )
 
 # %%

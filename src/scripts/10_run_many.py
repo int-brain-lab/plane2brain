@@ -4,13 +4,13 @@ import sys
 
 BASE_FOLDER = Path("/mnt/s0/Data/Subjects")
 session_paths = [
-    "SP058/2024-06-18/002",
+    # "SP058/2024-06-18/002", # multiple ref stacks
     "SP058/2024-06-19/001",
     "SP058/2024-06-20/001",
     "SP058/2024-06-21/001",
     "SP058/2024-06-25/001",
     "SP058/2024-06-26/001",
-    "SP058/2024-06-28/001",
+    # "SP058/2024-06-28/001", # fails bc of different z stack
     "SP058/2024-07-02/001",
     "SP058/2024-07-04/001",
     "SP058/2024-07-05/001",
@@ -25,11 +25,18 @@ session_paths = [
     "SP058/2024-07-25/001",
 ]
 
-for session_path in session_paths:
-    print(f" --- processing {session_path} --- ")
+# session_paths = [
+#     "SP058/2024-06-19/001",
+#     "SP058/2024-06-20/001",
+#     "SP058/2024-06-21/001",
+# ]
+
+for i, session_path in enumerate(session_paths):
+    print(f" --- processing {i + 1}/{len(session_paths)} : {session_path} --- ")
     # for script, args in [("first.py", ["arg1"]), ("second.py", ["arg2"])]:
     # left in here as a template to compare runs
-    script = "04_run_histo.py"
+    script = Path(__file__).parent / "04_run_histo.py"
+    # script = "03_run_angle_shift.py"
     result = subprocess.run([sys.executable, script, BASE_FOLDER / session_path])
     if result.returncode != 0:
         print(f"failed with code {result.returncode}")

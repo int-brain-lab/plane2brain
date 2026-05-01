@@ -183,10 +183,11 @@ def get_brain_surface_normal(
     # the position of the voice coil (for z offset calculation)
     # is the same for all stack planes, check here:
     # (could be turned into an assertion)
-    # fastz_pos = ref_img_meta["scanImageParams"]['hFastZ']['position']
-    stack_planes_dv = -1 * np.array(
-        ref_img_meta["scanImageParams"]["hStackManager"]["zs"]
+    # fastz_pos = ref_img_meta["scanImageParams"]["hFastZ"]["position"]
+    stack_planes_dv = -1 * (
+        np.array(ref_img_meta["scanImageParams"]["hStackManager"]["zs"])
     )
+
     ref_points_dv = stack_planes_dv[stack_ixs]
 
     # horizontally average plane between the selected surface points

@@ -201,13 +201,10 @@ def extract_fov_depths_from_scanimage_meta(
     """
     if fov_uuids is None:
         fov_uuids = _get_fov_uuids(scanimage_meta)
-    # extract the depth - a combination of the voicecoil (fast-z)
-    # and gantry position
-    # TODO VERIFY -> ask Krumin
-    # that this is the correct way how they are comined!
-    fastz_pos = scanimage_params["hFastZ"]["position"]
+
     fov_depths = {}
     for fov_uuid in fov_uuids:
-        fov_meta = get_fov_meta(scanimage_meta, fov_uuid)
-        fov_depths[fov_uuid] = -1 * (fov_meta["zs"] + fastz_pos)
+        # fov_meta = get_fov_meta(scanimage_meta, fov_uuid)
+        # fov_depths[fov_uuid] = -1 * (fastz_pos + fov_meta["zs"])
+        fov_depths[fov_uuid] = -1 * scanimage_params["hStackManager"]["zs"]
     return fov_depths
