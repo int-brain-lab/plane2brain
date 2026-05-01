@@ -40,6 +40,7 @@ dims = ("Y", "X")
 
 one = ONE()
 if len(sys.argv) == 1:
+    # NOTE this currently fails in vscode interactive mode
     # eid = one.ref2eid(dict(subject="SP058", date="2024-07-25", sequence="001"))
     eid = one.ref2eid(dict(subject="SP058", date="2024-08-01", sequence="001"))
     session_path = ibl._eid2path(eid, one, location=LOCATION)
@@ -324,21 +325,22 @@ coords = projections.correct_coords_for_tilt_2d(
     n_surface,
 )
 
-# %%
-# scanimage_meta = raw_imaging_meta['rawScanImageMeta']
-# scanimage_params = raw_imaging_meta["scanImageParams"]
-# from plane2brain.scanimage import _get_fov_uuids, get_fov_meta
-# if fov_uuids is None:
-#     fov_uuids = _get_fov_uuids(scanimage_meta)
-# # extract the depth - a combination of the voicecoil (fast-z)
-# # and gantry position
-# # TODO VERIFY -> ask Krumin
-# # that this is the correct way how they are comined!
-# fastz_pos = scanimage_params["hFastZ"]["position"]
-# fov_depths = {}
-# for fov_uuid in fov_uuids:
-#     fov_meta = get_fov_meta(scanimage_meta, fov_uuid)
-#     fov_depths[fov_uuid] = -1 * (fastz_pos + fov_meta["zs"])
+# %% use the um_corrected
+# this is for quantification of correcting for apparent position
+for fov_name, uuid in fov_map.items():
+    # transform to pixel in reference stack
+    px = coordinate_systems_ref.transform(
+        coords[uuid]["um_corrected"],
+        "um_global",
+        "pixel",
+    )
+    # get the corresponding pixel
+    coords[uuid]["mlap_histo_corrected"] = interp_xy(smoothed, *px.T)
+    # find point on surface
+    coords[uuid]["on_surface_histo_corrected"] = atlas.get_dv_for_mlap(
+        coords[uuid]["mlap_histo_corrected"]
+    )
+
 
 # %%
 """
@@ -351,38 +353,37 @@ coords = projections.correct_coords_for_tilt_2d(
 ##        ##     ##  #######   ######  ########  ######     ##    ####  #######  ##    ##
 """
 
-if 1:
-    # %% I have everything together to project downwards
-    for uuid in list(coords.keys()):
-        coords_reprojected = projections.project_down_from_surface(
-            coords_on_surface=coords[uuid]["on_surface_histo"],
-            atlas=atlas,
-            coords_depths=coords[uuid]["dv_below_surface"],
-        )
-        coords[uuid]["reprojected_histo"] = coords_reprojected  # this is mlapdv
+# %% project downwards
+for uuid in list(coords.keys()):
+    coords_reprojected = projections.project_down_from_surface(
+        coords_on_surface=coords[uuid]["on_surface_histo_corrected"],
+        atlas=atlas,
+        coords_depths=coords[uuid]["dv_below_surface"],
+    )
+    coords[uuid]["reprojected_histo_corrected"] = coords_reprojected  # this is mlapdv
 
-    # %% some quantification of differences
-    # for name, uuid in fov_map.items():
-    #     _coords = coords[uuid]["pixel"]
-    #     coords_um = coordinate_systems_2d[uuid].transform(_coords, "pixel", "um_global")
-    #     xy_min = np.min(coords_um - coords[uuid]["um_corrected"], axis=0)
-    #     xy_max = np.max(coords_um - coords[uuid]["um_corrected"], axis=0)
-    #     dv_min = np.min((dv_avg - fov_depths[uuid]) - coords[uuid]["dv_below_surface"])
-    #     dv_max = np.max((dv_avg - fov_depths[uuid]) - coords[uuid]["dv_below_surface"])
-    #     print(f"-- {name} --")
-    #     print(f"x: min/max {xy_min[0]:.2f}/{xy_max[0]:.2f}")
-    #     print(f"y: min/max {xy_min[1]:.2f}/{xy_max[1]:.2f}")
-    #     print(f"dv: min/max {dv_min:.2f}/{dv_max:.2f}")
-    #     print()
+# %% some quantification of differences
+# for name, uuid in fov_map.items():
+#     _coords = coords[uuid]["pixel"]
+#     coords_um = coordinate_systems_2d[uuid].transform(_coords, "pixel", "um_global")
+#     xy_min = np.min(coords_um - coords[uuid]["um_corrected"], axis=0)
+#     xy_max = np.max(coords_um - coords[uuid]["um_corrected"], axis=0)
+#     dv_min = np.min((dv_avg - fov_depths[uuid]) - coords[uuid]["dv_below_surface"])
+#     dv_max = np.max((dv_avg - fov_depths[uuid]) - coords[uuid]["dv_below_surface"])
+#     print(f"-- {name} --")
+#     print(f"x: min/max {xy_min[0]:.2f}/{xy_max[0]:.2f}")
+#     print(f"y: min/max {xy_min[1]:.2f}/{xy_max[1]:.2f}")
+#     print(f"dv: min/max {dv_min:.2f}/{dv_max:.2f}")
+#     print()
 
-    # %% map anything mlapdv to brain area
-    for name, uuid in fov_map.items():
-        ids, ix, rgba, acronym = atlas.get_labels_for_mlapdv(
-            coords[uuid]["reprojected_histo"]
-        )
-        coords[uuid]["atlas_rgba"] = rgba
-        coords[uuid]["atlas_acronym"] = acronym
-        coords[uuid]["atlas_id"] = ids
+# %% map anything mlapdv to brain area
+# for name, uuid in fov_map.items():
+#     ids, ix, rgba, acronym = atlas.get_labels_for_mlapdv(
+#         coords[uuid]["reprojected_histo"]
+#     )
+#     coords[uuid]["atlas_rgba"] = rgba
+#     coords[uuid]["atlas_acronym"] = acronym
+#     coords[uuid]["atlas_id"] = ids
 
 # %%
 """
@@ -419,15 +420,15 @@ if SAVE_OUTPUT:
             session_folder
             / "alf"
             / name
-            / "mpciROIs.mlapdv_histo_projection_mlapdv_2.npy",
-            coords[uuid]["reprojected_histo"],
+            / "mpciROIs.mlapdv_histo_projection_mlapdv_3.npy",
+            coords[uuid]["reprojected_histo_corrected"],
         )
         np.save(
             session_folder
             / "alf"
             / name
-            / "mpciROIs.mlapdv_histo_projection_surface_2.npy",
-            coords[uuid]["on_surface_histo"],
+            / "mpciROIs.mlapdv_histo_projection_surface_3.npy",
+            coords[uuid]["on_surface_histo_corrected"],
         )
 
         # coords_mlapdv = np.concatenate(
