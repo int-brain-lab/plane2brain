@@ -17,6 +17,7 @@ from iblatlas.atlas import MRITorontoAtlas
 
 import skimage
 from pathlib import Path
+import argparse
 
 # %% whiterussian / local server base folder
 BASE_FOLDER = Path("/mnt/s0/Data/Subjects")
@@ -25,6 +26,7 @@ LOCATION = "server"
 SAVE_OUTPUT = True
 PLOT = False
 DEBUG = False
+
 # %%
 """
  
@@ -38,22 +40,28 @@ DEBUG = False
  
 """
 
+one = ONE()
+
+parser = argparse.ArgumentParser()
+group = parser.add_mutually_exclusive_group()
+group.add_argument("--session_path", type=Path)
+group.add_argument("--eid")
+args, _ = parser.parse_known_args()
+
+if args.session_path is None and args.eid is None:
+    # Neither provided: use both defaults
+    session_path = BASE_FOLDER / "SP058/2024-08-01/001"
+    eid = one.path2eid(session_path)
+elif args.session_path is not None:
+    session_path = args.path
+    eid = one.path2eid(session_path)
+else:
+    eid = args.eid
+    session_path = ibl._eid2path(eid, one, location=LOCATION)
+
 # this is defined
 scanner_orientation = dict(rotation=0.0, invert_axis=[True, True, False])
 dims = ("Y", "X")
-
-one = ONE()
-if len(sys.argv) == 1:
-    # NOTE this currently fails in vscode interactive mode
-    # eid = one.ref2eid(dict(subject="SP058", date="2024-07-25", sequence="001"))
-    eid = one.ref2eid(dict(subject="SP058", date="2024-08-01", sequence="001"))
-    session_path = ibl._eid2path(eid, one, location=LOCATION)
-else:
-    session_path = Path(sys.argv[1])
-    eid = one.path2eid(session_path)
-# eid = one.ref2eid(dict(subject="SP058", date="2024-08-01", sequence="001"))
-# session_path = ibl._eid2path(eid, one, location=LOCATION)
-
 
 # load the reference image metadata
 ref_img_meta = ibl.load_reference_stack_metadata(eid, one, location=LOCATION)

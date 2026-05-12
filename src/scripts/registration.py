@@ -34,7 +34,7 @@ def register_stacks(
     ref_image_stack: np.ndarray,
     transform_type: Literal["euclidean", "affine"] = "euclidean",
     return_details: bool = False,
-) -> sktransform.GeometricTransform | tuple[sktransform.GeometricTransform, dict]:
+) -> sktransform.ProjectiveTransform | tuple[sktransform.ProjectiveTransform, dict]:
     """
     Find a 2D transform mapping image_stack -> ref_image_stack,
     using features from every z-plane.
@@ -115,7 +115,7 @@ def register_stacks(
 
 
 def apply_transform(
-    image_stack: np.ndarray, transform: sktransform.GeometricTransform
+    image_stack: np.ndarray, transform: sktransform.ProjectiveTransform
 ) -> np.ndarray:
     """Warp every plane of a stack using the same 2D transform."""
     out = np.empty_like(image_stack, dtype=np.float32)
