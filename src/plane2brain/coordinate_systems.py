@@ -266,7 +266,7 @@ def create_coordinate_system_for_image(
 
 
 def get_image_corners(
-    img_size_px: np.ndarray,
+    img_size_px: np.ndarray,  # FIXME not needed anymore
     coordinate_systems: LinkedCoordinateSystems,
     to: str = "um_global",  # TODO refactor me to 'in'
 ) -> Dict[str, np.ndarray]:
@@ -286,7 +286,7 @@ def get_image_corners(
         topright=[0, 1],
         bottomleft=[1, 0],
         bottomright=[1, 1],
-        center=img_size_px / 2,
+        center=[0.5, 0.5],  # img_size_px / 2, # FIXME this is wrong alos
     )
     return {
         name: coordinate_systems.transform(np.array(corner), "image", to)

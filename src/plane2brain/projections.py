@@ -252,7 +252,7 @@ def correct_coords_for_tilt_2d(
 
     Returns:
         The same `coords` dict, updated in-place with "um_corrected" and
-        "dv_below_surface" entries per FOV.
+        "dv_below_surface_corrected" entries per FOV.
     """
 
     for uuid in list(coords.keys()):
@@ -276,10 +276,12 @@ def correct_coords_for_tilt_2d(
 
         # then, the refined dv estimate is the distance between the original point
         # and the intersection point with the plane
-        dv_below_surface = np.sqrt(np.sum((coords_um_3d - coords_surface) ** 2, axis=1))
+        dv_below_surface_corrected = np.sqrt(
+            np.sum((coords_um_3d - coords_surface) ** 2, axis=1)
+        )
 
         coords[uuid]["um_corrected"] = coords_surface[:, :-1]
-        coords[uuid]["dv_below_surface"] = dv_below_surface
+        coords[uuid]["dv_below_surface_corrected"] = dv_below_surface_corrected
 
     return coords
 
@@ -290,7 +292,6 @@ def reproject_coords(  # FIXME refactor
     atlas: ProjectionAtlas,
     projection_vector: np.ndarray,
 ) -> Dict[str, Dict[str, np.ndarray]]:
-
     for uuid in list(coords.keys()):
         coords_on_surface = project_coords_onto_atlas_surface(
             coords[uuid]["um_corrected"],
