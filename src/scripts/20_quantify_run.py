@@ -11,29 +11,37 @@ import pandas as pd
 with open(Path(__file__).parent / "projected_sessions.txt", "r") as fH:
     session_paths = [line.strip() for line in fH.readlines()]
 
-# session_paths = session_paths[:3]
+session_paths = session_paths[:3]
 
 one = ONE()
 eids = [one.path2eid(path) for path in session_paths]
 
-
-# %% this is the faster iteration tmp
-chronic_data_repro_surface = chronic_data_loader.load_chronic_imaging(
-    eids,
-    one=one,
-    location="server",
-    mlapdv_file="mpciROIs.mlapdv_histo_projection_surface_2.npy",
-    metadata_only=True,
-)
-
 # %%
-chronic_data_repro_mlapdv = chronic_data_loader.load_chronic_imaging(
-    eids,
-    one=one,
-    location="server",
-    mlapdv_file="mpciROIs.mlapdv_histo_projection_mlapdv_2.npy",
-    metadata_only=True,
-)
+
+save_keys = [
+    "mlapdv_on_surface_histo",
+    "mlapdv_histo",
+    # "mlapdv_on_surface_histo_s2s_corr",
+    # "mlapdv_histo_s2s_corr",
+    # "mlapdv_on_surface_histo_s2s_i25_corr",
+    # "mlapdv_histo_s2s_i25_corr",
+    # "mlapdv_on_surface_histo_s2s_i1_corr",
+    # "mlapdv_histo_s2s_i1_corr",
+    # "mlapdv_on_surface_histo_s2s_i25_apxy_corr",
+    # "mlapdv_histo_s2s_i25_apxy_corr",
+    # "mlapdv_histo_s2s_i25_apxyz_corr",
+]
+
+chronic_data = {}
+
+for key in save_keys:
+    chronic_data[key] = chronic_data_loader.load_chronic_imaging(
+        eids,
+        one=one,
+        location="server",
+        mlapdv_file=f"mpciROIs.mlapdv_repro_{key}.npy",
+        metadata_only=True,
+    )
 
 # %%
 
@@ -44,9 +52,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # chronic_data = chronic_data_est
-chronic_data = chronic_data_repro_mlapdv
+# chronic_data = chronic_data_repro_mlapdv
 fovs = ["FOV_00", "FOV_01", "FOV_02", "FOV_03", "FOV_04", "FOV_05", "FOV_06", "FOV_07"]
-fovs = ["FOV_05"]
+# fovs = ["FOV_05"]
 
 common_UCIDs = {}
 for fov in fovs:

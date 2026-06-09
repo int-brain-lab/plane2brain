@@ -51,9 +51,7 @@ ref_point = ibl.load_reference_points_from_meta(
 # load the suite2p data
 raw_imaging_meta, stat_paths, fov_map = ibl.load_fov_data(eid, one, location=LOCATION)
 fov_names = sorted(list(fov_map.keys()))
-coords_px = suite2p.data_loader(
-    stat_paths, fov_map, dims=dims
-)  # refactor: rename coords_px
+coords_px = suite2p.data_loader(stat_paths, fov_map)  # refactor: rename coords_px
 
 # this is the atlas to project onto
 atlas = ProjectionAtlas(res_um=50)
@@ -303,38 +301,37 @@ for uuid, coordinate_system in coordinate_systems_fovs.items():
     _corners = coordinate_systems_3d.transform(_corners, "imaging_plane", "mlapdv")
     axes.plot(*_corners.T, lw=1, color="k", zorder=10)
 
-# %% back in 2d: verify coordinates of ROIs
+# %%
+coords = {}
+for fov_name, uuid in fov_map.items():
+    coords[uuid] = {}
 
-fig, axes = plt.subplots()
-
-image_kwargs = dict(
-    # extent=plotters.extent_from_corners(corners),
-    cmap="gray",
-    vmin=np.percentile(ref_img_stack, 5),
-    vmax=np.percentile(ref_img_stack, 99.9),
-)
-axes.matshow(ref_img_stack[6, :], **image_kwargs)
-
-for uuid, coordinate_system in coordinate_systems_fovs.items():
-    fov_meta = scanimage.get_fov_meta(raw_imaging_meta["rawScanImageMeta"], uuid)
-    fov_size_px = scanimage.get_scanfield_size_px(fov_meta, dims=dims)
-
-    corners = get_image_corners(fov_size_px, coordinate_system, to="um_global")
-    # _corners = np.array([np.append(corners[e], 0) for e in edges])
-    _corners = np.array([corners[e] for e in edges])
-    _corners = coordinate_systems_ref.transform(_corners, "um_global", "pixel")
-    axes.plot(
-        *_corners.T[::-1], lw=1, color="r", zorder=10
-    )  # again, inverting here to have ml, ap
-
-for uuid, coordinate_system in coordinate_systems_fovs.items():
-    coords_um_global = coordinate_system.transform(
-        coords_px[uuid], "pixel", "um_global"
+# %%
+for fov_name, uuid in fov_map.items():
+    px = coords_px[uuid][:, ::-1]
+    coords_um_global = coordinate_systems_fovs[uuid].transform(px, "pixel", "um_global")
+    coords_um_global = np.concatenate(
+        [coords_um_global, np.zeros((coords_um_global.shape[0], 1))], axis=1
     )
-    px_global = coordinate_systems_ref.transform(coords_um_global, "um_global", "pixel")
+    # px = coordinate_systems_ref.transform(coords_um_global, "um_global", "pixel")
+    coords[uuid]["mlapdv_plane"] = coordinate_systems_3d.transform(
+        coords_um_global, "imaging_plane", "mlapdv"
+    )
 
-    axes.scatter(*px_global.T[::-1], color="g", s=0.5, alpha=0.5)
+# %%
+axes = plotters.plot_brain_surface_points(atlas.get_surface_points())
+# axes.view_init(elev=60, azim=-20)
+axes.view_init(elev=90, azim=0)
+for fov_name, uuid in fov_map.items():
+    plotters.plot_points(coords[uuid]["mlapdv_plane"], axes=axes, s=1)
 
+# axes.set_xlim(0, 4000)
+# axes.set_ylim(-4000, 0)
+
+# %%
+fig, axes = plt.subplots()
+for fov_name, uuid in fov_map.items():
+    axes.scatter(*coords[uuid]["mlapdv_plane"][:, :-1].T, s=1)
 
 # %%
 """

@@ -317,7 +317,7 @@ def plot_keypoints(
 ) -> None:
     fig, axes = plt.subplots()
     image_concatenated = np.concatenate(
-        [img_data["stack"][z], img_data["target_stack"][z]], axis=1
+        [_norm(img_data["stack"][z]), _norm(img_data["target_stack"][z])], axis=1
     )
     image_kwargs = dict(
         vmin=np.percentile(image_concatenated, 5),

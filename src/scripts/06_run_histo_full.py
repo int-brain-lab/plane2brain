@@ -1,6 +1,5 @@
 # %%
 import sys
-import json
 import numpy as np
 from plane2brain import plotters, projections, scanimage, suite2p, ibl
 from plane2brain.coordinate_systems import (
@@ -11,13 +10,12 @@ from plane2brain.atlas import ProjectionAtlas
 from one.api import ONE
 import matplotlib.pyplot as plt
 
-from ibllib.mpci.registration import register_reference_stacks, preprocess_vasculature
+from ibllib.mpci.registration import register_reference_stacks
 from ibllib.mpci.tasks import MesoscopeFOVHistology
 from iblatlas.atlas import MRITorontoAtlas
 
 import skimage
 from pathlib import Path
-import argparse
 
 # %% whiterussian / local server base folder
 BASE_FOLDER = Path("/mnt/s0/Data/Subjects")
@@ -25,7 +23,6 @@ BASE_FOLDER = Path("/mnt/s0/Data/Subjects")
 LOCATION = "server"
 SAVE_OUTPUT = True
 PLOT = False
-DEBUG = False
 
 # %%
 """
@@ -40,28 +37,19 @@ DEBUG = False
  
 """
 
-one = ONE()
-
-parser = argparse.ArgumentParser()
-group = parser.add_mutually_exclusive_group()
-group.add_argument("--session_path", type=Path)
-group.add_argument("--eid")
-args, _ = parser.parse_known_args()
-
-if args.session_path is None and args.eid is None:
-    # Neither provided: use both defaults
-    session_path = BASE_FOLDER / "SP058/2024-08-01/001"
-    eid = one.path2eid(session_path)
-elif args.session_path is not None:
-    session_path = args.session_path
-    eid = one.path2eid(session_path)
-else:
-    eid = args.eid
-    session_path = ibl._eid2path(eid, one, location=LOCATION)
-
 # this is defined
 scanner_orientation = dict(rotation=0.0, invert_axis=[True, True, False])
 dims = ("Y", "X")
+
+one = ONE()
+if len(sys.argv) == 1:
+    # NOTE this currently fails in vscode interactive mode
+    # eid = one.ref2eid(dict(subject="SP058", date="2024-07-25", sequence="001"))
+    eid = one.ref2eid(dict(subject="SP058", date="2024-08-01", sequence="001"))
+    session_path = ibl._eid2path(eid, one, location=LOCATION)
+else:
+    session_path = Path(sys.argv[1])
+    eid = one.path2eid(session_path)
 
 # load the reference image metadata
 ref_img_meta = ibl.load_reference_stack_metadata(eid, one, location=LOCATION)
@@ -130,6 +118,7 @@ ref_img_size_um = ref_img_size_px * um_per_px
 
 # from the transform we computed between the reference stacks (of the session at hand
 # and the reference session)
+# we take the translation component to integrate it here by shifting the ref point
 
 # reference session for SP058: "SP058/2024-08-14/001"
 eid_ref = one.ref2eid(dict(subject="SP058", date="2024-08-14", sequence="001"))
@@ -154,14 +143,6 @@ ref_sess_ref_stack_path = ibl.get_reference_stack_path(
 
 # %% only for whiterussian use
 
-########  ######## ########     ######  ########  ######   ######     ########  ######## ########     ######  ########    ###     ######  ##    ##
-##     ## ##       ##          ##    ## ##       ##    ## ##    ##    ##     ## ##       ##          ##    ##    ##      ## ##   ##    ## ##   ##
-##     ## ##       ##          ##       ##       ##       ##          ##     ## ##       ##          ##          ##     ##   ##  ##       ##  ##
-########  ######   ######       ######  ######    ######   ######     ########  ######   ######       ######     ##    ##     ## ##       #####
-##   ##   ##       ##                ## ##             ##       ##    ##   ##   ##       ##                ##    ##    ######### ##       ##  ##
-##    ##  ##       ##          ##    ## ##       ##    ## ##    ##    ##    ##  ##       ##          ##    ##    ##    ##     ## ##    ## ##   ##
-##     ## ######## ##           ######  ########  ######   ######     ##     ## ######## ##           ######     ##    ##     ##  ######  ##    ##
-
 # session_path = BASE_FOLDER / one.eid2path(eid).session_path_short()
 reference_session_path = BASE_FOLDER / one.eid2path(eid_ref).session_path_short()
 
@@ -183,90 +164,29 @@ ref_img_histo_mlapdv = (
     ba.ccf2xyz(ccf_idx * ba.res_um, ccf_order="mlapdv") * 1e6
 )  # m -> μm
 
-
-########  ########  ######
-##     ## ##       ##    ##
-##     ## ##       ##
-########  ######   ##   ####
-##   ##   ##       ##    ##
-##    ##  ##       ##    ##
-##     ## ########  ######
-
-
-# %% reimplementation of stack image registration
-import tifffile
-from registration import (
-    register_stacks,
-    apply_transform,
-    inspect_registration_delta,
-    evaluate,
-    plot_keypoints,
+# %% the transform between this session and the ref stack of the histo session
+# empirically determined that this way is the correct direction:
+_, transform_params = register_reference_stacks(
+    ref_sess_ref_stack_path,
+    ref_stack_path,
+    display=True,
+    save_path=session_path / "alf" / "_gr_reference_stack_registration.gif",
 )
 
-# load the reference stack data from session and reference session
-img_data = {}
-for key, path in zip(
-    ["stack", "target_stack"],
-    [ref_stack_path, ref_sess_ref_stack_path],
-):
-    # key here: flipping dimensions
-    img_data[key] = np.swapaxes(tifffile.imread(path), 1, 2)
-    # img_data[key] = preprocess_vasculature(img_data[key]).astype("int16")
-
-# find and apply transform
-ref_transform, reg_details = register_stacks(
-    img_data["stack"],
-    img_data["target_stack"],
-    transform_type="euclidean",
-    return_details=True,
-)
-# NOTE affine is overall actually worse, but better for single plane
-
-img_data["aligned"] = apply_transform(img_data["stack"], ref_transform)
-
-# evaluate transform
-ncc_before = evaluate(img_data["stack"], img_data["target_stack"])
-ncc_after = evaluate(img_data["aligned"], img_data["target_stack"])
-
-params = {
-    "translation": ref_transform.translation,
-    "rotation": ref_transform.rotation,
-    "quality_ncc": ncc_after.mean(),
-    "warp_matrix": np.array(ref_transform),
-    "method": "orb_robust",
-}
-
-# save to gif
-save_path = session_path / "alf" / "_gr_reference_stack_registration.gif"
-z = 8
-anim = inspect_registration_delta(
-    img_data["stack"],
-    img_data["target_stack"],
-    img_data["aligned"],
-    z=z,
-    save_path=save_path,
-    frames_per_second=1,  # 1s per frame in the saved gif
+# the transform between the reference stack and the "reference reference" stack
+# = the reference stack of the reference session
+ref_transform = skimage.transform.EuclideanTransform(
+    rotation=transform_params["rotation"],
+) + skimage.transform.EuclideanTransform(
+    translation=transform_params["translation"],
 )
 
-# plot keypoints vis
-plot_keypoints(
-    img_data,
-    reg_details,
-    z,
-    save_path=session_path / "alf" / "_gr_registration_keypoints.png",
-)
+# warp_matrix = np.concatenate([transform_params["warp_matrix"], [[0, 0, 1]]], axis=0)
+# ref_transform = skimage.transform.EuclideanTransform(matrix=warp_matrix)
 
-# save transform to json
-params = params.copy()
-for k, v in params.items():
-    if isinstance(v, np.ndarray):
-        params[k] = v.tolist()
-    elif isinstance(v, (np.float32, np.float64)):
-        params[k] = float(v)
-    else:
-        params[k] = v
-with open(save_path.with_suffix(".json"), "w") as fp:
-    json.dump(params, fp, indent=4)
+# the translation part can be easily used to shift ROIs in um_global space
+# this is never used in this pipeline as well
+# session_shift_um = transform_params["translation"] * um_per_px
 
 # %% setting up the coordinate systems for the imaged fovs
 fov_uuids = sorted(list(fov_map.values()))
@@ -378,20 +298,17 @@ interp_smooth = RegularGridInterpolator(
 )
 
 # %% first: just indexing
-if not DEBUG:
-    for fov_name, uuid in fov_map.items():
-        # global px
-        px = coords_px[uuid]
-        coords_um_global = coordinate_systems_2d[uuid].transform(
-            px, "pixel", "um_global"
-        )
-        px = coordinate_systems_ref.transform(coords_um_global, "um_global", "pixel")
+for fov_name, uuid in fov_map.items():
+    # global px
+    px = coords_px[uuid]
+    coords_um_global = coordinate_systems_2d[uuid].transform(px, "pixel", "um_global")
+    px = coordinate_systems_ref.transform(coords_um_global, "um_global", "pixel")
 
-        # straight indexing
-        px = px.astype("int")
-        px[:, 0] = np.clip(px[:, 0], 0, grid.shape[0] - 1)
-        px[:, 1] = np.clip(px[:, 1], 0, grid.shape[1] - 1)
-        coords[uuid]["indexing"] = ref_img_histo_mlapdv[px[:, 0], px[:, 1], :]
+    # straight indexing
+    px = px.astype("int")
+    px[:, 0] = np.clip(px[:, 0], 0, grid.shape[0] - 1)
+    px[:, 1] = np.clip(px[:, 1], 0, grid.shape[1] - 1)
+    coords[uuid]["indexing"] = ref_img_histo_mlapdv[px[:, 0], px[:, 1], :]
 
 
 # %% second: using interpolation
@@ -404,22 +321,15 @@ for fov_name, uuid in fov_map.items():
     # interpolation
     coords_mlap = interp(px)
 
-    if not DEBUG:
-        coords[uuid]["on_surface_interp"] = atlas.get_dv_for_mlap(
-            coords_mlap + 1e-6  # DOCME
-        )
-        # projecting inward
-        coords[uuid]["interp"] = projections.project_down_from_surface(
-            coords_on_surface=coords[uuid]["on_surface_interp"],
-            atlas=atlas,
-            coords_depths=coords[uuid]["dv_below_surface"],
-        )
-    else:
-        # keep fake 3d for debugging
-        coords[uuid]["on_surface_interp"] = np.concatenate(
-            [coords_mlap, np.zeros((coords_mlap.shape[0], 1))], axis=1
-        )
-
+    # projecting inward
+    coords[uuid]["on_surface_interp"] = atlas.get_dv_for_mlap(
+        coords_mlap + 1e-6  # DOCME
+    )
+    coords[uuid]["interp"] = projections.project_down_from_surface(
+        coords_on_surface=coords[uuid]["on_surface_interp"],
+        atlas=atlas,
+        coords_depths=coords[uuid]["dv_below_surface"],
+    )
 
 # %% third: with session to session shift, no smoothing
 for fov_name, uuid in fov_map.items():
@@ -434,23 +344,16 @@ for fov_name, uuid in fov_map.items():
     # histology lookup
     coords_mlap = interp(px)
 
-    if not DEBUG:
-        coords[uuid]["on_surface_interp_s2s"] = atlas.get_dv_for_mlap(
-            coords_mlap + 1e-6,
-        )
-        # projecting inward
-        coords[uuid]["interp_s2s"] = projections.project_down_from_surface(
-            coords_on_surface=coords[uuid]["on_surface_interp_s2s"],
-            atlas=atlas,
-            coords_depths=coords[uuid]["dv_below_surface"],
-        )
-    else:
-        # keep fake 3d for debugging
-        coords[uuid]["on_surface_interp_s2s"] = np.concatenate(
-            [coords_mlap, np.zeros((coords_mlap.shape[0], 1))], axis=1
-        )
+    # projecting inward
+    coords[uuid]["on_surface_interp_s2s"] = atlas.get_dv_for_mlap(coords_mlap + 1e-6)
+    coords[uuid]["interp_s2s"] = projections.project_down_from_surface(
+        coords_on_surface=coords[uuid]["on_surface_interp_s2s"],
+        atlas=atlas,
+        coords_depths=coords[uuid]["dv_below_surface"],
+    )
 
 # %% next: same as before, but with smoothed grid for interpolation
+
 for fov_name, uuid in fov_map.items():
     # global pixel
     px = coords_px[uuid]
@@ -463,22 +366,13 @@ for fov_name, uuid in fov_map.items():
     # histology lookup
     mlap_interp = interp_smooth(px)
 
-    if not DEBUG:
-        coords[uuid]["on_surface_interp_smooth_s2s"] = atlas.get_dv_for_mlap(
-            mlap_interp
-        )
-
-        # projecting inward
-        coords[uuid]["interp_smooth_s2s"] = projections.project_down_from_surface(
-            coords_on_surface=coords[uuid]["on_surface_interp_smooth_s2s"],
-            atlas=atlas,
-            coords_depths=coords[uuid]["dv_below_surface"],
-        )
-    else:
-        coords[uuid]["on_surface_interp_smooth_s2s"] = np.concatenate(
-            [mlap_interp, np.zeros((mlap_interp.shape[0], 1))], axis=1
-        )
-
+    # projecting inward
+    coords[uuid]["on_surface_interp_smooth_s2s"] = atlas.get_dv_for_mlap(mlap_interp)
+    coords[uuid]["interp_smooth_s2s"] = projections.project_down_from_surface(
+        coords_on_surface=coords[uuid]["on_surface_interp_smooth_s2s"],
+        atlas=atlas,
+        coords_depths=coords[uuid]["dv_below_surface"],
+    )
 
 # %% next: include apparent xy shift
 # %%
@@ -521,34 +415,33 @@ coords = projections.correct_coords_for_tilt_2d(
     n_surface,
 )
 
-if not DEBUG:
-    for fov_name, uuid in fov_map.items():
-        # use the um_corrected to transform back to px
-        px = coordinate_systems_ref.transform(
-            coords[uuid]["um_corrected"], "um_global", "pixel"
-        )
-        # apply session to session correction
-        px = ref_transform(px)
+for fov_name, uuid in fov_map.items():
+    # use the um_corrected to transform back to px
+    px = coordinate_systems_ref.transform(
+        coords[uuid]["um_corrected"], "um_global", "pixel"
+    )
+    # apply session to session correction
+    px = ref_transform(px)
 
-        # histo lookup
-        mlap_interp = interp_smooth(px)
+    # histo lookup
+    mlap_interp = interp_smooth(px)
 
-        # find point on surface
-        coords[uuid]["on_surface_interp_smooth_s2s_apxy"] = atlas.get_dv_for_mlap(
-            mlap_interp
-        )
-        # project down uncorrected amount
-        coords[uuid]["interp_smooth_s2s_apxy"] = projections.project_down_from_surface(
-            coords_on_surface=coords[uuid]["on_surface_interp_smooth_s2s_apxy"],
-            atlas=atlas,
-            coords_depths=coords[uuid]["dv_below_surface"],
-        )
-        # project down CORRECTED amount
-        coords[uuid]["interp_smooth_s2s_apxyz"] = projections.project_down_from_surface(
-            coords_on_surface=coords[uuid]["on_surface_interp_smooth_s2s_apxy"],
-            atlas=atlas,
-            coords_depths=coords[uuid]["dv_below_surface_corrected"],
-        )
+    # find point on surface
+    coords[uuid]["on_surface_interp_smooth_s2s_apxy"] = atlas.get_dv_for_mlap(
+        mlap_interp
+    )
+    # project down uncorrected amount
+    coords[uuid]["interp_smooth_s2s_apxy"] = projections.project_down_from_surface(
+        coords_on_surface=coords[uuid]["on_surface_interp_smooth_s2s_apxy"],
+        atlas=atlas,
+        coords_depths=coords[uuid]["dv_below_surface"],
+    )
+    # project down CORRECTED amount
+    coords[uuid]["interp_smooth_s2s_apxyz"] = projections.project_down_from_surface(
+        coords_on_surface=coords[uuid]["on_surface_interp_smooth_s2s_apxy"],
+        atlas=atlas,
+        coords_depths=coords[uuid]["dv_below_surface_corrected"],
+    )
 
 
 # %%
@@ -576,30 +469,14 @@ save_keys = [
     "interp_smooth_s2s_apxyz",
 ]
 
-if DEBUG:
-    save_keys = [
-        # "indexing",
-        "on_surface_interp",
-        # "interp",
-        "on_surface_interp_s2s",
-        #     "interp_s2s",
-        "on_surface_interp_smooth_s2s",
-        #     "interp_smooth_s2s",
-        # "on_surface_interp_smooth_s2s_apxy",
-        #     "interp_smooth_s2s_apxy",
-        #     "interp_smooth_s2s_apxyz",
-    ]
-
 
 if SAVE_OUTPUT:
     for name, uuid in fov_map.items():
         session_folder = ibl._eid2path(eid, one, location=LOCATION)
+        # coords_mlapdv = coords[uuid]["reprojected_histo"]
         for key in save_keys:
             np.save(
-                session_folder
-                / "alf"
-                / name
-                / f"mpciROIs.mlapdv_repro_ransac_25_{key}.npy",
+                session_folder / "alf" / name / f"mpciROIs.mlapdv_repro_{key}.npy",
                 coords[uuid][key],
             )
 

@@ -60,7 +60,7 @@ fov_names = sorted(list(fov_map.keys()))
 coords_px = suite2p.data_loader(stat_paths, fov_map)  # refactor: rename coords_px
 
 # this is the atlas to project onto
-atlas = ProjectionAtlas(res_um=50)
+atlas = ProjectionAtlas(res_um=25)
 
 
 # %%
@@ -168,7 +168,10 @@ ref_img_histo_mlapdv = (
 )  # m -> μm
 
 # %% the transform between this session and the ref stack of the histo session
-_, transform_params = register_reference_stacks(ref_stack_path, ref_sess_ref_stack_path)
+# _, transform_params = register_reference_stacks(ref_stack_path, ref_sess_ref_stack_path)
+
+# empirically determined that this way is the correct direction:
+_, transform_params = register_reference_stacks(ref_sess_ref_stack_path, ref_stack_path)
 
 # the transform between the reference stack and the "reference reference" stack
 # = the reference stack of the reference session
@@ -206,6 +209,7 @@ coordinate_systems_ref = create_coordinate_system_for_image(
 session_shift_ref = transform_params["translation"] * ref_img_ref_per_px
 # the inversion of dimensions is necessary
 ref_img_topleft_ref_corr = ref_img_topleft_ref + session_shift_ref[::-1]
+# ref_img_topleft_ref_corr = ref_img_topleft_ref + session_shift_ref
 
 # the 2d coordinate system in of the reference image
 coordinate_systems_ref_corr = create_coordinate_system_for_image(
@@ -306,14 +310,17 @@ for fov_name, uuid in fov_map.items():
     coords_um_global = coordinate_systems_2d[uuid].transform(px, "pixel", "um_global")
     px = coordinate_systems_ref.transform(coords_um_global, "um_global", "pixel")
     coords[uuid]["mlap_histo"] = interp_xy(grid, *px.T)
-    coords[uuid]["mlapdv_on_surface_histo"] = atlas.get_dv_for_mlap(
-        coords[uuid]["mlap_histo"] + 1e-6
+    # coords[uuid]["mlapdv_on_surface_histo"] = atlas.get_dv_for_mlap(
+    #     coords[uuid]["mlap_histo"] + 1e-6
+    # )
+    coords[uuid]["mlapdv_on_surface_histo"] = np.concatenate(
+        [coords[uuid]["mlap_histo"], np.zeros((px.shape[0], 1))], axis=1
     )
-    coords[uuid]["mlapdv_histo"] = projections.project_down_from_surface(
-        coords_on_surface=coords[uuid]["mlapdv_on_surface_histo"],
-        atlas=atlas,
-        coords_depths=coords[uuid]["dv_below_surface"],
-    )
+    # coords[uuid]["mlapdv_histo"] = projections.project_down_from_surface(
+    #     coords_on_surface=coords[uuid]["mlapdv_on_surface_histo"],
+    #     atlas=atlas,
+    #     coords_depths=coords[uuid]["dv_below_surface"],
+    # )
 
 # %% next: with session to session shift, no interpolation
 
@@ -335,50 +342,72 @@ grid = ref_img_histo_mlapdv[:, :, :-1]
 for fov_name, uuid in fov_map.items():
     px = coords_px[uuid]
     coords_um_global = coordinate_systems_2d[uuid].transform(px, "pixel", "um_global")
-    px = coordinate_systems_ref_corr.transform(coords_um_global, "um_global", "pixel")
+    # px = coordinate_systems_ref_corr.transform(coords_um_global, "um_global", "pixel")
+    # ALT START
+    px = coordinate_systems_ref.transform(coords_um_global, "um_global", "pixel")
+    px = ref_transform(px)
+
+    # ALT END
     coords[uuid]["mlap_histo_s2s_corr"] = interp_xy(grid, *px.T)
-    coords[uuid]["mlapdv_on_surface_histo_s2s_corr"] = atlas.get_dv_for_mlap(
-        coords[uuid]["mlap_histo_s2s_corr"] + 1e-6
+    # coords[uuid]["mlapdv_on_surface_histo_s2s_corr"] = atlas.get_dv_for_mlap(
+    #     coords[uuid]["mlap_histo_s2s_corr"] + 1e-6
+    # )
+    coords[uuid]["mlapdv_on_surface_histo_s2s_corr"] = np.concatenate(
+        [coords[uuid]["mlap_histo_s2s_corr"], np.zeros((px.shape[0], 1))], axis=1
     )
-    coords[uuid]["mlapdv_histo_s2s_corr"] = projections.project_down_from_surface(
-        coords_on_surface=coords[uuid]["mlapdv_on_surface_histo_s2s_corr"],
-        atlas=atlas,
-        coords_depths=coords[uuid]["dv_below_surface"],
-    )
+    # coords[uuid]["mlapdv_histo_s2s_corr"] = projections.project_down_from_surface(
+    #     coords_on_surface=coords[uuid]["mlapdv_on_surface_histo_s2s_corr"],
+    #     atlas=atlas,
+    #     coords_depths=coords[uuid]["dv_below_surface"],
+    # )
 
 # %% next: same as before, but with interpolation 25
-sigma = 25
-smoothed = gaussian_filter(grid.astype(float), sigma=(sigma, sigma, 0))
-for fov_name, uuid in fov_map.items():
-    px = coords_px[uuid]
-    coords_um_global = coordinate_systems_2d[uuid].transform(px, "pixel", "um_global")
-    px = coordinate_systems_ref_corr.transform(coords_um_global, "um_global", "pixel")
-    coords[uuid]["mlap_histo_s2s_i25_corr"] = interp_xy(smoothed, *px.T)
-    coords[uuid]["mlapdv_on_surface_histo_s2s_i25_corr"] = atlas.get_dv_for_mlap(
-        coords[uuid]["mlap_histo_s2s_i25_corr"]
-    )
-    coords[uuid]["mlapdv_histo_s2s_i25_corr"] = projections.project_down_from_surface(
-        coords_on_surface=coords[uuid]["mlapdv_on_surface_histo_s2s_i25_corr"],
-        atlas=atlas,
-        coords_depths=coords[uuid]["dv_below_surface"],
-    )
-
-# %% next: same as before, but with interpolation 1
 sigma = 1
 smoothed = gaussian_filter(grid.astype(float), sigma=(sigma, sigma, 0))
 for fov_name, uuid in fov_map.items():
     px = coords_px[uuid]
     coords_um_global = coordinate_systems_2d[uuid].transform(px, "pixel", "um_global")
-    px = coordinate_systems_ref_corr.transform(coords_um_global, "um_global", "pixel")
+    # px = coordinate_systems_ref_corr.transform(coords_um_global, "um_global", "pixel")
+    # ALT
+    px = coordinate_systems_ref.transform(coords_um_global, "um_global", "pixel")
+    px = ref_transform(px)
+
     coords[uuid]["mlap_histo_s2s_i1_corr"] = interp_xy(smoothed, *px.T)
-    coords[uuid]["mlapdv_on_surface_histo_s2s_i1_corr"] = atlas.get_dv_for_mlap(
-        coords[uuid]["mlap_histo_s2s_i1_corr"]
+    # coords[uuid]["mlapdv_on_surface_histo_s2s_i25_corr"] = atlas.get_dv_for_mlap(
+    #     coords[uuid]["mlap_histo_s2s_i25_corr"]
+    # )
+    coords[uuid]["mlapdv_on_surface_histo_s2s_i1_corr"] = np.concatenate(
+        [coords[uuid]["mlap_histo_s2s_i1_corr"], np.zeros((px.shape[0], 1))], axis=1
     )
-    coords[uuid]["mlapdv_histo_s2s_i1_corr"] = projections.project_down_from_surface(
-        coords_on_surface=coords[uuid]["mlapdv_on_surface_histo_s2s_i1_corr"],
-        atlas=atlas,
-        coords_depths=coords[uuid]["dv_below_surface"],
-    )
+    # coords[uuid]["mlapdv_histo_s2s_i25_corr"] = projections.project_down_from_surface(
+    #     coords_on_surface=coords[uuid]["mlapdv_on_surface_histo_s2s_i25_corr"],
+    #     atlas=atlas,
+    #     coords_depths=coords[uuid]["dv_below_surface"],
+    # )
+
+# %% inspect grid
+# fig, axes = plt.subplots()
+# axes.plot(grid[:,0,0])
+# axes.plot(smoothed[:,0,0])
+# axes.set_xlim(200,220)
+# axes.set_ylim(2500,2800)
+
+# %% next: same as before, but with interpolation 1
+# sigma = 1
+# smoothed = gaussian_filter(grid.astype(float), sigma=(sigma, sigma, 0))
+# for fov_name, uuid in fov_map.items():
+#     px = coords_px[uuid]
+#     coords_um_global = coordinate_systems_2d[uuid].transform(px, "pixel", "um_global")
+#     px = coordinate_systems_ref_corr.transform(coords_um_global, "um_global", "pixel")
+#     coords[uuid]["mlap_histo_s2s_i1_corr"] = interp_xy(smoothed, *px.T)
+#     coords[uuid]["mlapdv_on_surface_histo_s2s_i1_corr"] = atlas.get_dv_for_mlap(
+#         coords[uuid]["mlap_histo_s2s_i1_corr"]
+#     )
+#     coords[uuid]["mlapdv_histo_s2s_i1_corr"] = projections.project_down_from_surface(
+#         coords_on_surface=coords[uuid]["mlapdv_on_surface_histo_s2s_i1_corr"],
+#         atlas=atlas,
+#         coords_depths=coords[uuid]["dv_below_surface"],
+#     )
 
 # %% next: include apparent xy shift
 # %%
@@ -395,13 +424,13 @@ for fov_name, uuid in fov_map.items():
 
 # %% adjusting for the fact that this is not the case: getting the optical axis
 # load the brain surface points and get the normal
-brain_surface_points = ibl.load_brain_surface_points(eid, one, location=LOCATION)
+# brain_surface_points = ibl.load_brain_surface_points(eid, one, location=LOCATION)
 
 # this normal is expressed in the coordinate system of the reference stack
 p_surface, n_surface, dv_avg = projections.get_brain_surface_normal(
     brain_surface_points,
     ref_img_meta,
-    coordinate_systems_ref_corr,
+    coordinate_systems_ref,
 )
 
 # extract depths
@@ -421,54 +450,62 @@ coords = projections.correct_coords_for_tilt_2d(
     n_surface,
 )
 
-# TODO verify that sigma 25 is the better one
-sigma = 25
+sigma = 1
 smoothed = gaussian_filter(grid.astype(float), sigma=(sigma, sigma, 0))
 for fov_name, uuid in fov_map.items():
     # use the um_corrected to transform back to pix
     # transform to pixel in reference stack
-    px = coordinate_systems_ref_corr.transform(
-        coords[uuid]["um_corrected"],
-        "um_global",
-        "pixel",
+    # px = coordinate_systems_ref_corr.transform(
+    #     coords[uuid]["um_corrected"], "um_global", "pixel"
+    # )
+
+    # ALT
+    px = coordinate_systems_ref.transform(
+        coords[uuid]["um_corrected"], "um_global", "pixel"
     )
+    px = ref_transform(px)
+
     # get the corresponding pixel
-    coords[uuid]["mlap_histo_s2s_i25_apxy_corr"] = interp_xy(smoothed, *px.T)
+    coords[uuid]["mlap_histo_s2s_i1_apxy_corr"] = interp_xy(smoothed, *px.T)
     # find point on surface
-    coords[uuid]["mlapdv_on_surface_histo_s2s_i25_apxy_corr"] = atlas.get_dv_for_mlap(
-        coords[uuid]["mlap_histo_s2s_i25_apxy_corr"]
+    # coords[uuid]["mlapdv_on_surface_histo_s2s_i25_apxy_corr"] = atlas.get_dv_for_mlap(
+    #     coords[uuid]["mlap_histo_s2s_i25_apxy_corr"]
+    # )
+    coords[uuid]["mlapdv_on_surface_histo_s2s_i1_apxy_corr"] = np.concatenate(
+        [coords[uuid]["mlap_histo_s2s_i1_apxy_corr"], np.zeros((px.shape[0], 1))],
+        axis=1,
     )
     # project down uncorrected amount
-    coords[uuid]["mlapdv_histo_s2s_i25_apxy_corr"] = (
-        projections.project_down_from_surface(
-            coords_on_surface=coords[uuid]["mlapdv_on_surface_histo_s2s_i25_apxy_corr"],
-            atlas=atlas,
-            coords_depths=coords[uuid]["dv_below_surface"],
-        )
-    )
+    # coords[uuid]["mlapdv_histo_s2s_i25_apxy_corr"] = (
+    #     projections.project_down_from_surface(
+    #         coords_on_surface=coords[uuid]["mlapdv_on_surface_histo_s2s_i25_apxy_corr"],
+    #         atlas=atlas,
+    #         coords_depths=coords[uuid]["dv_below_surface"],
+    #     )
+    # )
     # project down CORRECTED amount
-    coords[uuid]["mlapdv_histo_s2s_i25_apxyz_corr"] = (
-        projections.project_down_from_surface(
-            coords_on_surface=coords[uuid]["mlapdv_on_surface_histo_s2s_i25_apxy_corr"],
-            atlas=atlas,
-            coords_depths=coords[uuid]["dv_below_surface_corrected"],
-        )
-    )
+    # coords[uuid]["mlapdv_histo_s2s_i25_apxyz_corr"] = (
+    #     projections.project_down_from_surface(
+    #         coords_on_surface=coords[uuid]["mlapdv_on_surface_histo_s2s_i25_apxy_corr"],
+    #         atlas=atlas,
+    #         coords_depths=coords[uuid]["dv_below_surface_corrected"],
+    #     )
+    # )
 
 
 # %%
 
 
 # %% deal with this in a moment
-i, j = ref_img_size_px // 2
-center_mlap = interp_xy(smoothed, i, j)
-ref_point["mlap_adjusted"] = center_mlap
+# i, j = ref_img_size_px // 2
+# center_mlap = interp_xy(smoothed, i, j)
+# ref_point["mlap_adjusted"] = center_mlap
 
-# additionally, if this is not the reference session:
-# does not matter for this projection but possibly for the others
-if eid != eid_ref:
-    # TODO figure out if this is plus or minus
-    ref_point["mlap_adjusted"] = ref_point["mlap_adjusted"] + session_shift_um
+# # additionally, if this is not the reference session:
+# # does not matter for this projection but possibly for the others
+# if eid != eid_ref:
+#     # TODO figure out if this is plus or minus
+#     ref_point["mlap_adjusted"] = ref_point["mlap_adjusted"] + session_shift_um
 
 
 # %%
@@ -526,31 +563,31 @@ if eid != eid_ref:
 """
 
 # %% 2d plotting
-fig, axes = plt.subplots()
-for fov_name, uuid in fov_map.items():
-    axes.scatter(*coords[uuid]["mlap_histo"].T)
+# fig, axes = plt.subplots()
+# for fov_name, uuid in fov_map.items():
+#     axes.scatter(*coords[uuid]["mlap_histo"].T)
 
 # %% plot them in 3d
 #
-plot_keys = [
-    "mlapdv_on_surface_histo",
-    # "mlapdv_histo",
-    # "mlapdv_on_surface_histo_s2s_corr",
-    # "mlapdv_histo_s2s_corr",
-    # "mlapdv_on_surface_histo_s2s_i25_corr",
-    # "mlapdv_histo_s2s_i25_corr",
-    # "mlapdv_on_surface_histo_s2s_i1_corr",
-    # "mlapdv_histo_s2s_i1_corr",
-    # "mlapdv_on_surface_histo_s2s_i25_apxy_corr",
-    # "mlapdv_histo_s2s_i25_apxy_corr",
-    # "mlapdv_histo_s2s_i25_apxyz_corr",
-]
+# plot_keys = [
+#     "mlapdv_on_surface_histo",
+# "mlapdv_histo",
+# "mlapdv_on_surface_histo_s2s_corr",
+# "mlapdv_histo_s2s_corr",
+# "mlapdv_on_surface_histo_s2s_i25_corr",
+# "mlapdv_histo_s2s_i25_corr",
+# "mlapdv_on_surface_histo_s2s_i1_corr",
+# "mlapdv_histo_s2s_i1_corr",
+# "mlapdv_on_surface_histo_s2s_i25_apxy_corr",
+# "mlapdv_histo_s2s_i25_apxy_corr",
+# "mlapdv_histo_s2s_i25_apxyz_corr",
+# ]
 
-axes = plotters.plot_brain_surface_points(atlas.get_surface_points())
-# axes.view_init(elev=70, azim=-70)
-for fov_name, uuid in fov_map.items():
-    for key in plot_keys:
-        plotters.plot_points(coords[uuid][key], axes=axes)
+# axes = plotters.plot_brain_surface_points(atlas.get_surface_points())
+# # axes.view_init(elev=70, azim=-70)
+# for fov_name, uuid in fov_map.items():
+#     for key in plot_keys:
+#         plotters.plot_points(coords[uuid][key], axes=axes)
 
 # %%
 """
@@ -566,16 +603,16 @@ for fov_name, uuid in fov_map.items():
 """
 save_keys = [
     "mlapdv_on_surface_histo",
-    "mlapdv_histo",
+    # "mlapdv_histo",
     "mlapdv_on_surface_histo_s2s_corr",
-    "mlapdv_histo_s2s_corr",
-    "mlapdv_on_surface_histo_s2s_i25_corr",
-    "mlapdv_histo_s2s_i25_corr",
+    # "mlapdv_histo_s2s_corr",
+    # "mlapdv_on_surface_histo_s2s_i25_corr",
+    # "mlapdv_histo_s2s_i25_corr",
     "mlapdv_on_surface_histo_s2s_i1_corr",
-    "mlapdv_histo_s2s_i1_corr",
-    "mlapdv_on_surface_histo_s2s_i25_apxy_corr",
-    "mlapdv_histo_s2s_i25_apxy_corr",
-    "mlapdv_histo_s2s_i25_apxyz_corr",
+    # "mlapdv_histo_s2s_i1_corr",
+    "mlapdv_on_surface_histo_s2s_i1_apxy_corr",
+    # "mlapdv_histo_s2s_i25_apxy_corr",
+    # "mlapdv_histo_s2s_i25_apxyz_corr",
 ]
 
 if SAVE_OUTPUT:
@@ -587,32 +624,3 @@ if SAVE_OUTPUT:
                 session_folder / "alf" / name / f"mpciROIs.mlapdv_repro_{key}.npy",
                 coords[uuid][key],
             )
-        # np.save(
-        #     session_folder
-        #     / "alf"
-        #     / name
-        #     / "mpciROIs.mlapdv_histo_projection_surface_5.npy",
-        #     coords[uuid]["on_surface_histo_corrected"],
-        # )
-
-        # coords_mlapdv = np.concatenate(
-        #     [
-        #         coords[uuid]["on_surface_histo"],
-        #         np.zeros((coords[uuid]["mlap_histo"].shape[0], 1)),
-        #     ],
-        #     axis=1,
-        # )
-
-        # saving the updated coordinates
-
-        # saving the atlas ids
-        # atlas_ids = atlas.get_labels_for_mlapdv(coords_mlapdv)[0]
-        # np.save(
-        #     session_folder
-        #     / "alf"
-        #     / name
-        #     / "mpciROIs.brainLocationIds_ccf_2017_histo_projection_4.npy",
-        #     atlas_ids,
-        # )
-
-# %%

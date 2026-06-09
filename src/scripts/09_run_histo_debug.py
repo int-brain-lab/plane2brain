@@ -1,6 +1,5 @@
 # %%
 import sys
-import json
 import numpy as np
 from plane2brain import plotters, projections, scanimage, suite2p, ibl
 from plane2brain.coordinate_systems import (
@@ -11,13 +10,12 @@ from plane2brain.atlas import ProjectionAtlas
 from one.api import ONE
 import matplotlib.pyplot as plt
 
-from ibllib.mpci.registration import register_reference_stacks, preprocess_vasculature
+from ibllib.mpci.registration import register_reference_stacks
 from ibllib.mpci.tasks import MesoscopeFOVHistology
 from iblatlas.atlas import MRITorontoAtlas
 
 import skimage
 from pathlib import Path
-import argparse
 
 # %% whiterussian / local server base folder
 BASE_FOLDER = Path("/mnt/s0/Data/Subjects")
@@ -26,7 +24,6 @@ LOCATION = "server"
 SAVE_OUTPUT = True
 PLOT = False
 DEBUG = False
-
 # %%
 """
  
@@ -40,28 +37,19 @@ DEBUG = False
  
 """
 
-one = ONE()
-
-parser = argparse.ArgumentParser()
-group = parser.add_mutually_exclusive_group()
-group.add_argument("--session_path", type=Path)
-group.add_argument("--eid")
-args, _ = parser.parse_known_args()
-
-if args.session_path is None and args.eid is None:
-    # Neither provided: use both defaults
-    session_path = BASE_FOLDER / "SP058/2024-08-01/001"
-    eid = one.path2eid(session_path)
-elif args.session_path is not None:
-    session_path = args.session_path
-    eid = one.path2eid(session_path)
-else:
-    eid = args.eid
-    session_path = ibl._eid2path(eid, one, location=LOCATION)
-
 # this is defined
 scanner_orientation = dict(rotation=0.0, invert_axis=[True, True, False])
 dims = ("Y", "X")
+
+one = ONE()
+if len(sys.argv) == 1:
+    # NOTE this currently fails in vscode interactive mode
+    # eid = one.ref2eid(dict(subject="SP058", date="2024-07-25", sequence="001"))
+    eid = one.ref2eid(dict(subject="SP058", date="2024-08-01", sequence="001"))
+    session_path = ibl._eid2path(eid, one, location=LOCATION)
+else:
+    session_path = Path(sys.argv[1])
+    eid = one.path2eid(session_path)
 
 # load the reference image metadata
 ref_img_meta = ibl.load_reference_stack_metadata(eid, one, location=LOCATION)
@@ -184,89 +172,156 @@ ref_img_histo_mlapdv = (
 )  # m -> μm
 
 
-########  ########  ######
-##     ## ##       ##    ##
-##     ## ##       ##
-########  ######   ##   ####
-##   ##   ##       ##    ##
-##    ##  ##       ##    ##
-##     ## ########  ######
+##     ## ######## ########  ########
+##     ## ##       ##     ## ##
+##     ## ##       ##     ## ##
+######### ######   ########  ######
+##     ## ##       ##   ##   ##
+##     ## ##       ##    ##  ##
+##     ## ######## ##     ## ########
 
 
-# %% reimplementation of stack image registration
-import tifffile
-from registration import (
-    register_stacks,
-    apply_transform,
-    inspect_registration_delta,
-    evaluate,
-    plot_keypoints,
-)
+# %% the transform between this session and the ref stack of the histo session
+if 0:
+    img_data, transform_params = register_reference_stacks(
+        ref_stack_path,  # 1
+        ref_sess_ref_stack_path,  # 2
+        invert_dims=True,
+        # display=True,
+        # save_path=session_path / "alf" / "_gr_reference_stack_registration.gif",
+    )
 
-# load the reference stack data from session and reference session
-img_data = {}
-for key, path in zip(
-    ["stack", "target_stack"],
-    [ref_stack_path, ref_sess_ref_stack_path],
-):
-    # key here: flipping dimensions
-    img_data[key] = np.swapaxes(tifffile.imread(path), 1, 2)
-    # img_data[key] = preprocess_vasculature(img_data[key]).astype("int16")
+    # the transform between the reference stack and the "reference reference" stack
+    # = the reference stack of the reference session
+    ref_transform = skimage.transform.EuclideanTransform(
+        rotation=transform_params["rotation"],
+    ) + skimage.transform.EuclideanTransform(
+        translation=transform_params["translation"],
+    )
 
-# find and apply transform
-ref_transform, reg_details = register_stacks(
-    img_data["stack"],
-    img_data["target_stack"],
-    transform_type="euclidean",
-    return_details=True,
-)
-# NOTE affine is overall actually worse, but better for single plane
+    warp_matrix = np.concatenate([transform_params["warp_matrix"], [[0, 0, 1]]], axis=0)
+    ref_transform = skimage.transform.EuclideanTransform(matrix=warp_matrix)
 
-img_data["aligned"] = apply_transform(img_data["stack"], ref_transform)
+# now with affine transform
+# warp_matrix = np.concatenate([transform_params["warp_matrix"], [[0, 0, 1]]], axis=0)
+# ref_transform = skimage.transform.AffineTransform(matrix=warp_matrix)
 
-# evaluate transform
-ncc_before = evaluate(img_data["stack"], img_data["target_stack"])
-ncc_after = evaluate(img_data["aligned"], img_data["target_stack"])
+# the translation part can be easily used to shift ROIs in um_global space
+# this is never used in this pipeline as well
+# session_shift_um = transform_params["translation"] * um_per_px
 
-params = {
-    "translation": ref_transform.translation,
-    "rotation": ref_transform.rotation,
-    "quality_ncc": ncc_after.mean(),
-    "warp_matrix": np.array(ref_transform),
-    "method": "orb_robust",
-}
+# %% compare to pystackreg
+if 0:
+    from pystackreg import StackReg
+    import tifffile
 
-# save to gif
-save_path = session_path / "alf" / "_gr_reference_stack_registration.gif"
-z = 8
-anim = inspect_registration_delta(
-    img_data["stack"],
-    img_data["target_stack"],
-    img_data["aligned"],
-    z=z,
-    save_path=save_path,
-    frames_per_second=1,  # 1s per frame in the saved gif
-)
+    sr = StackReg(StackReg.AFFINE)  # or AFFINE
+    image_stack = tifffile.imread(ref_stack_path)
+    ref_image_stack = tifffile.imread(ref_sess_ref_stack_path)
+    tmats = sr.register_stack(
+        np.stack([ref_image_stack, image_stack]).mean(axis=1), reference="first"
+    )
 
-# plot keypoints vis
-plot_keypoints(
-    img_data,
-    reg_details,
-    z,
-    save_path=session_path / "alf" / "_gr_registration_keypoints.png",
-)
+    ref_transform = skimage.transform.EuclideanTransform(matrix=tmats[1])
+    # try this with affine!
+    ref_transform = skimage.transform.EuclideanTransform(matrix=tmats[1])
 
-# save transform to json
-params = params.copy()
-for k, v in params.items():
-    if isinstance(v, np.ndarray):
-        params[k] = v.tolist()
-    elif isinstance(v, (np.float32, np.float64)):
-        params[k] = float(v)
-    else:
-        params[k] = v
-with open(save_path.with_suffix(".json"), "w") as fp:
-    json.dump(params, fp, indent=4)
+# %% opus
+if 1:
+    import numpy as np
+    import cv2
+    from skimage import transform as sktransform
+    from skimage.measure import ransac
+
+    def _to_uint8(img):
+        """Normalize to uint8 for ORB."""
+        img = img.astype(np.float32)
+        lo, hi = np.percentile(img, [1, 99])
+        img = np.clip((img - lo) / (hi - lo + 1e-8), 0, 1)
+        return (img * 255).astype(np.uint8)
+
+    def register_stacks(image_stack, ref_image_stack, transform_type="euclidean"):
+        """
+        Find a 2D transform mapping image_stack -> ref_image_stack,
+        using features from every z-plane.
+
+        Parameters
+        ----------
+        image_stack, ref_image_stack : ndarray, shape (Z, Y, X)
+            Assumes plane z in moving corresponds to plane z in reference.
+        transform_type : {'euclidean', 'affine'}
+
+        Returns
+        -------
+        tform : skimage transform
+            Maps moving coords -> reference coords.
+            Use sktransform.warp(img, tform.inverse) to resample moving onto ref.
+        """
+        assert image_stack.shape == ref_image_stack.shape
+
+        orb = cv2.ORB_create(nfeatures=2000)
+        bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+
+        src_all, dst_all = [], []
+        for z in range(image_stack.shape[0]):
+            mov = _to_uint8(image_stack[z])
+            ref = _to_uint8(ref_image_stack[z])
+
+            kp1, des1 = orb.detectAndCompute(mov, None)
+            kp2, des2 = orb.detectAndCompute(ref, None)
+            if des1 is None or des2 is None:
+                continue
+
+            matches = sorted(bf.match(des1, des2), key=lambda m: m.distance)
+            matches = matches[: max(10, len(matches) // 2)]  # keep best half
+
+            src_all.append(np.float32([kp1[m.queryIdx].pt for m in matches]))
+            dst_all.append(np.float32([kp2[m.trainIdx].pt for m in matches]))
+
+        src = np.vstack(src_all)
+        dst = np.vstack(dst_all)
+
+        model_cls = {
+            "euclidean": sktransform.EuclideanTransform,
+            "affine": sktransform.AffineTransform,
+        }[transform_type]
+
+        model, inliers = ransac(
+            (src, dst),
+            model_cls,
+            min_samples=3,
+            residual_threshold=2.0,
+            max_trials=2000,
+        )
+        print(f"{inliers.sum()}/{len(inliers)} inliers across all planes")
+        return model
+
+    def apply_transform(image_stack, tform):
+        """Warp every plane of a stack using the same 2D transform."""
+        out = np.empty_like(image_stack, dtype=np.float32)
+        for z in range(image_stack.shape[0]):
+            out[z] = sktransform.warp(
+                image_stack[z],
+                tform.inverse,
+                preserve_range=True,
+                order=1,
+            )
+        return out
+
+    import tifffile
+
+    # NOTE: flipping the dimensions of the ref stack is what did the trick
+    image_stack = tifffile.imread(ref_stack_path)
+    image_stack = np.swapaxes(image_stack, 1, 2)
+    ref_image_stack = tifffile.imread(ref_sess_ref_stack_path)
+    ref_image_stack = np.swapaxes(ref_image_stack, 1, 2)
+    tform = register_stacks(image_stack, ref_image_stack, transform_type="euclidean")
+    # tform = register_stacks(ref_image_stack, image_stack, transform_type="affine")
+    ref_transform = skimage.transform.EuclideanTransform(matrix=tform)
+    # print("matrix:\n", tform.params)
+    # print("rotation (rad):", tform.rotation, "translation:", tform.translation)
+
+    # aligned = apply_transform(image_stack, tform)
 
 # %% setting up the coordinate systems for the imaged fovs
 fov_uuids = sorted(list(fov_map.values()))
@@ -599,7 +654,7 @@ if SAVE_OUTPUT:
                 session_folder
                 / "alf"
                 / name
-                / f"mpciROIs.mlapdv_repro_ransac_25_{key}.npy",
+                / f"mpciROIs.mlapdv_repro_debug_{key}.npy",
                 coords[uuid][key],
             )
 
