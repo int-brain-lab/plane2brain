@@ -23,18 +23,12 @@ from typing import Literal
 
 # %% whiterussian / local server base folder
 COORDS: Literal["rois", "px"] = "px"
-LOCATION: Literal["server", "local"] = "server"
-SAVE_OUTPUT: bool = False
+LOCATION: Literal["server", "local", "popeye"] = "popeye"
+SAVE_OUTPUT: bool = True
 PLOT: bool = False
 DEBUG: bool = False
 ATLAS_RES: int = 100
 
-# %%
-match LOCATION:
-    case 'server':
-        BASE_FOLDER: Path = Path("/mnt/s0/Data/Subjects")
-    case 'local':
-        raise NotImplementedError # 
 # %%
 """
  
@@ -48,10 +42,11 @@ match LOCATION:
  
 """
 
-if LOCATION == 'popeye':
+if LOCATION == "popeye":
     from deploy.iblsdsc import OneSdsc
+
     # requires the unmerged PR #121 https://github.com/int-brain-lab/iblscripts/pull/121
-    one = OneSdsc(location='popeye')
+    one = OneSdsc(location="popeye")
 else:
     one = ONE()
 
@@ -63,8 +58,20 @@ args, _ = parser.parse_known_args()
 
 if args.session_path is None and args.eid is None:
     # Neither provided: use both defaults
-    session_path = BASE_FOLDER / "SP058/2024-08-01/001"
-    eid = one.path2eid(session_path)
+    match LOCATION:
+        case "server":
+            session_path = Path("/mnt/s0/Data/Subjects/SP058/2024-08-01/001")
+            eid = one.path2eid(session_path)
+        case "popeye":
+            session_path = Path(
+                # "/mnt/home/graiser/data/cortexlab/Subjects/SP058/2024-08-01/001" # the original test case
+                "/mnt/sdceph/users/ibl/data/cortexlab/Subjects/SP058/2024-07-04/001"  # no ref stack
+            )
+            eid = one.path2eid(session_path)
+        case "local":
+            eid = one.path2eid("SP058/2024-08-01/001")
+            session_path = one.eid2path(eid)
+
 elif args.session_path is not None:
     # if session path is provided, infer eid
     session_path = args.session_path
@@ -73,6 +80,8 @@ else:
     # or if eid is provided, infer session path
     eid = args.eid
     session_path = ibl._eid2path(eid, one, location=LOCATION)
+
+print(f"{eid}:{session_path}")
 
 # this is defined
 scanner_orientation = dict(rotation=0.0, invert_axis=[True, True, False])
@@ -85,23 +94,31 @@ ref_point = ibl.load_reference_points_from_meta(
 )  # the craniotomy center, both in ml,ap (histology resolved) and in
 
 # load the suite2p data
-raw_imaging_meta, stat_paths, fov_map = ibl.load_fov_data(eid, one, location=LOCATION)
+raw_imaging_meta, stat_paths, fov_map = ibl.load_fov_data(
+    eid,
+    one,
+    location=LOCATION,
+    scratch_dir=Path.home() / "ibl_scratch" / str(eid)
+    if LOCATION == "popeye"
+    else None,
+)
 fov_names = sorted(list(fov_map.keys()))
 
-if COORDS == 'rois':
+if COORDS == "rois":
     coords_px = suite2p.data_loader(
         stat_paths, fov_map, dims=dims
     )  # refactor: rename coords_px
-elif COORDS == 'px':
+elif COORDS == "px":
     coords_px = {}
     if DEBUG:
         n = 5
     else:
         # cannot assert Width == Height because of the format of the FOVs being stitched
         # together vertically (mesoscope specific)
-        n = raw_imaging_meta['rawScanImageMeta']['Width']
+        n = raw_imaging_meta["rawScanImageMeta"]["Width"]
+        # n = 5 # debug hack
     for name, uuid in fov_map.items():
-        coords_px[uuid] = np.array(list(product(range(n),repeat=2)), dtype='float')
+        coords_px[uuid] = np.array(list(product(range(n), repeat=2)), dtype="float")
 
 # this is the atlas to project onto
 atlas = ProjectionAtlas(res_um=ATLAS_RES)
@@ -189,18 +206,27 @@ ref_sess_ref_stack_path = ibl.get_reference_stack_path(
 ##    ##  ##       ##          ##    ## ##       ##    ## ##    ##    ##    ##  ##       ##          ##    ##    ##    ##     ## ##    ## ##   ##
 ##     ## ######## ##           ######  ########  ######   ######     ##     ## ######## ##           ######     ##    ##     ##  ######  ##    ##
 
-# session_path = BASE_FOLDER / one.eid2path(eid).session_path_short()
-# FIXME 
-reference_session_path = BASE_FOLDER / one.eid2path(eid_ref).session_path_short()
+reference_session_path = ibl._eid2path(eid_ref, one, location=LOCATION)
 
-meso_task = MesoscopeFOVHistology(
-    session_path=session_path, reference_session=reference_session_path, one=one
-)
-meso_task.setUp()
+match LOCATION:
+    case "server":
+        meso_task = MesoscopeFOVHistology(
+            session_path=session_path, reference_session=reference_session_path, one=one
+        )
+        meso_task.setUp()
 
-# meso_task.load_reference_stack()
-ccf_idx = np.load(meso_task._get_atlas_registered_reference_mlap())
-
+        # meso_task.load_reference_stack()
+        ccf_idx = np.load(meso_task._get_atlas_registered_reference_mlap())
+    case "local":
+        raise NotImplementedError
+    case "popeye":
+        # has local access to the histo
+        ccf_idx = np.load(
+            Path("/mnt/sdceph/users/ibl/data/histology/")
+            / "cortexlab"
+            / one.eid2path(eid_ref).session_path_short()
+            / "referenceImage.mlapdv.npy",
+        )
 
 ba = MRITorontoAtlas(res_um=25)
 ccf_idx[:, :, 1] = np.abs(ccf_idx[:, :, 1].astype("int64") - ba.label.shape[0]).astype(
@@ -268,7 +294,7 @@ params = {
 if PLOT:
     if SAVE_OUTPUT:
         save_path = session_path / "alf" / "_gr_reference_stack_registration.gif"
-    else: 
+    else:
         save_path = None
 
     z = 8
@@ -285,7 +311,7 @@ if PLOT:
 if PLOT:
     if SAVE_OUTPUT:
         save_path = session_path / "alf" / "_gr_registration_keypoints.png"
-    else: 
+    else:
         save_path = None
 
     plot_keypoints(
@@ -295,19 +321,19 @@ if PLOT:
         save_path=save_path,
     )
 
-# %% save transform to json
-if SAVE_OUTPUT:
-    params = params.copy()
-    for k, v in params.items():
-        if isinstance(v, np.ndarray):
-            params[k] = v.tolist()
-        elif isinstance(v, (np.float32, np.float64)):
-            params[k] = float(v)
-        else:
-            params[k] = v
+    # save transform to json
+    if SAVE_OUTPUT:
+        params = params.copy()
+        for k, v in params.items():
+            if isinstance(v, np.ndarray):
+                params[k] = v.tolist()
+            elif isinstance(v, (np.float32, np.float64)):
+                params[k] = float(v)
+            else:
+                params[k] = v
 
-    with open(save_path.with_suffix(".json"), "w") as fp:
-        json.dump(params, fp, indent=4)
+        with open(save_path.with_suffix(".json"), "w") as fp:
+            json.dump(params, fp, indent=4)
 
 # %% setting up the coordinate systems for the imaged fovs
 fov_uuids = sorted(list(fov_map.values()))
@@ -357,18 +383,25 @@ for fov_uuid in fov_uuids:
 
 # extract depths
 fov_uuids = sorted(list(fov_map.values()))
-if COORDS == 'rois':
+if COORDS == "rois":
     fov_depths = scanimage.extract_fov_depths_from_scanimage_meta(
         scanimage_meta=raw_imaging_meta["rawScanImageMeta"],
         scanimage_params=raw_imaging_meta["scanImageParams"],
         fov_uuids=fov_uuids,
     )
-if COORDS == 'px':
+if COORDS == "px":
     fov_depths = {uuid: 0 for uuid in fov_uuids}
 
 # get the depth below brain surface by averaging the dv
 # reference points on the brain surface
-brain_surface_points = ibl.load_brain_surface_points(eid, one, location=LOCATION)
+match LOCATION:
+    case "popeye":
+        # on popeye we can only use the ones stored in the metadata
+        brain_surface_points = {"points": ref_img_meta["points"]}
+    case _:
+        brain_surface_points = ibl.load_brain_surface_points(
+            eid, one, location=LOCATION
+        )
 
 # this normal is expressed in the coordinate system of the reference stack
 p_surface, n_surface, dv_avg = projections.get_brain_surface_normal(
@@ -377,17 +410,16 @@ p_surface, n_surface, dv_avg = projections.get_brain_surface_normal(
     coordinate_systems_ref,
 )
 # the untilted plane
-if COORDS == 'rois':
+if COORDS == "rois":
     for uuid in fov_uuids:
         n = coords[uuid]["pixel"].shape[0]
         coords[uuid]["dv_below_surface"] = np.ones(n) * np.absolute(
             fov_depths[uuid] - dv_avg
         )
-if COORDS == 'px':
+if COORDS == "px":
     for uuid in fov_uuids:
         n = coords[uuid]["pixel"].shape[0]
         coords[uuid]["dv_below_surface"] = np.zeros(n)
-
 
 
 # %%
@@ -431,14 +463,15 @@ interp_smooth = RegularGridInterpolator(
 # %% plot interpolation
 if PLOT:
     fig, axes = plt.subplots(ncols=2)
-    kwargs = dict(cmap="viridis", vmin=np.percentile(grid, 1), vmax=np.percentile(grid, 99))
+    kwargs = dict(
+        cmap="viridis", vmin=np.percentile(grid, 1), vmax=np.percentile(grid, 99)
+    )
 
     titles = ["ml", "ap"]
     for i in range(2):
         axes[i].matshow(grid[:, :, i], **kwargs)
         axes[i].set_title(titles[i])
         axes[i].axhline(120, color="k", lw=1, alpha=0.5)
-
 
     fig, axes = plt.subplots()
     axes.plot(grid[120, :, 0], label="original")
@@ -479,12 +512,13 @@ for fov_name, uuid in fov_map.items():
         coords[uuid]["on_surface_interp"] = atlas.get_dv_for_mlap(
             coords_mlap + 1e-6  # DOCME
         )
-        # projecting inward
-        coords[uuid]["interp"] = projections.project_down_from_surface(
-            coords_on_surface=coords[uuid]["on_surface_interp"],
-            atlas=atlas,
-            coords_depths=coords[uuid]["dv_below_surface"],
-        )
+        if COORDS == "rois":
+            # projecting inward
+            coords[uuid]["interp"] = projections.project_down_from_surface(
+                coords_on_surface=coords[uuid]["on_surface_interp"],
+                atlas=atlas,
+                coords_depths=coords[uuid]["dv_below_surface"],
+            )
     else:
         # keep fake 3d for debugging
         coords[uuid]["on_surface_interp"] = np.concatenate(
@@ -503,12 +537,13 @@ for fov_name, uuid in fov_map.items():
     if not DEBUG:
         coords[uuid]["on_surface_interp_smooth"] = atlas.get_dv_for_mlap(mlap_interp)
 
-        # projecting inward
-        coords[uuid]["interp_smooth"] = projections.project_down_from_surface(
-            coords_on_surface=coords[uuid]["on_surface_interp_smooth"],
-            atlas=atlas,
-            coords_depths=coords[uuid]["dv_below_surface"],
-        )
+        if COORDS == "rois":
+            # projecting inward
+            coords[uuid]["interp_smooth"] = projections.project_down_from_surface(
+                coords_on_surface=coords[uuid]["on_surface_interp_smooth"],
+                atlas=atlas,
+                coords_depths=coords[uuid]["dv_below_surface"],
+            )
     else:
         coords[uuid]["on_surface_interp_smooth"] = np.concatenate(
             [mlap_interp, np.zeros((mlap_interp.shape[0], 1))], axis=1
@@ -532,12 +567,13 @@ for fov_name, uuid in fov_map.items():
         coords[uuid]["on_surface_interp_smooth_s2s"] = atlas.get_dv_for_mlap(
             coords_mlap + 1e-6,
         )
-        # projecting inward
-        coords[uuid]["interp_smooth_s2s"] = projections.project_down_from_surface(
-            coords_on_surface=coords[uuid]["on_surface_interp_smooth_s2s"],
-            atlas=atlas,
-            coords_depths=coords[uuid]["dv_below_surface"],
-        )
+        if COORDS == "rois":
+            # projecting inward
+            coords[uuid]["interp_smooth_s2s"] = projections.project_down_from_surface(
+                coords_on_surface=coords[uuid]["on_surface_interp_smooth_s2s"],
+                atlas=atlas,
+                coords_depths=coords[uuid]["dv_below_surface"],
+            )
     else:
         # keep fake 3d for debugging
         coords[uuid]["on_surface_interp_smooth_s2s"] = np.concatenate(
@@ -560,7 +596,14 @@ for fov_name, uuid in fov_map.items():
 
 # %% adjusting for the fact that this is not the case: getting the optical axis
 # load the brain surface points and get the normal
-brain_surface_points = ibl.load_brain_surface_points(eid, one, location=LOCATION)
+match LOCATION:
+    case "popeye":
+        # on popeye we can only use the ones stored in the metadata
+        brain_surface_points = {"points": ref_img_meta["points"]}
+    case _:
+        brain_surface_points = ibl.load_brain_surface_points(
+            eid, one, location=LOCATION
+        )
 
 # this normal is expressed in the coordinate system of the reference stack
 p_surface, n_surface, dv_avg = projections.get_brain_surface_normal(
@@ -572,13 +615,13 @@ p_surface, n_surface, dv_avg = projections.get_brain_surface_normal(
 # extract depths
 fov_uuids = sorted(list(fov_map.values()))
 
-if COORDS == 'rois':
+if COORDS == "rois":
     fov_depths = scanimage.extract_fov_depths_from_scanimage_meta(
         scanimage_meta=raw_imaging_meta["rawScanImageMeta"],
         scanimage_params=raw_imaging_meta["scanImageParams"],
         fov_uuids=fov_uuids,
     )
-if COORDS == 'px':
+if COORDS == "px":
     fov_depths = {uuid: 0 for uuid in fov_uuids}
 
 # this creates: the keys
@@ -607,18 +650,22 @@ if not DEBUG:
         coords[uuid]["on_surface_interp_smooth_s2s_apxy"] = atlas.get_dv_for_mlap(
             mlap_interp
         )
-        if COORDS == 'rois':
+        if COORDS == "rois":
             # project down uncorrected amount
-            coords[uuid]["interp_smooth_s2s_apxy"] = projections.project_down_from_surface(
-                coords_on_surface=coords[uuid]["on_surface_interp_smooth_s2s_apxy"],
-                atlas=atlas,
-                coords_depths=coords[uuid]["dv_below_surface"],
+            coords[uuid]["interp_smooth_s2s_apxy"] = (
+                projections.project_down_from_surface(
+                    coords_on_surface=coords[uuid]["on_surface_interp_smooth_s2s_apxy"],
+                    atlas=atlas,
+                    coords_depths=coords[uuid]["dv_below_surface"],
+                )
             )
             # project down CORRECTED amount
-            coords[uuid]["interp_smooth_s2s_apxyz"] = projections.project_down_from_surface(
-                coords_on_surface=coords[uuid]["on_surface_interp_smooth_s2s_apxy"],
-                atlas=atlas,
-                coords_depths=coords[uuid]["dv_below_surface_corrected"],
+            coords[uuid]["interp_smooth_s2s_apxyz"] = (
+                projections.project_down_from_surface(
+                    coords_on_surface=coords[uuid]["on_surface_interp_smooth_s2s_apxy"],
+                    atlas=atlas,
+                    coords_depths=coords[uuid]["dv_below_surface_corrected"],
+                )
             )
 
 
@@ -634,7 +681,7 @@ if not DEBUG:
   ######  ##     ##    ###    ########     #######   #######     ##    ##         #######     ##    
  
 """
-if COORDS == 'rois':
+if COORDS == "rois":
     save_keys = [
         "indexing",
         "on_surface_interp",
@@ -664,17 +711,36 @@ if COORDS == 'rois':
 
     if SAVE_OUTPUT:
         for name, uuid in fov_map.items():
-            session_folder = ibl._eid2path(eid, one, location=LOCATION)
-            for key in save_keys:
-                np.save(
-                    session_folder
-                    / "alf"
-                    / name
-                    / f"mpciROIs.mlapdv_repro_ransac_ro_{ATLAS_RES}_{key}.npy",
-                    coords[uuid][key],
-                )
+            match LOCATION:
+                case "server" | "local":
+                    session_folder = ibl._eid2path(eid, one, location=LOCATION)
+                    for key in save_keys:
+                        np.save(
+                            session_folder
+                            / "alf"
+                            / name
+                            / f"mpciROIs.mlapdv_repro_ransac_ro_{ATLAS_RES}_{key}.npy",
+                            coords[uuid][key],
+                        )
+                case "popeye":
+                    output_folder = (
+                        Path.home()
+                        / "ibl_scratch"
+                        / "repro"
+                        / one.eid2path(eid).session_path_short()
+                        / "alf"
+                        / name
+                    )
+                    output_folder.mkdir(exist_ok=True, parents=True)
+                    for key in save_keys:
+                        np.save(
+                            output_folder
+                            / f"mpciROIs.mlapdv_repro_ransac_ro_{ATLAS_RES}_{key}.npy",
+                            coords[uuid][key],
+                        )
 
-if COORDS == 'px':
+
+if COORDS == "px":
     save_keys = [
         "indexing",
         "on_surface_interp",
@@ -699,13 +765,31 @@ if COORDS == 'px':
 
     if SAVE_OUTPUT:
         for name, uuid in fov_map.items():
-            session_folder = ibl._eid2path(eid, one, location=LOCATION)
-            for key in save_keys:
-                np.save(
-                    session_folder
-                    / "alf"
-                    / name
-                    / f"mpciMeanImage.mlapdv_repro_ransac_ro_{ATLAS_RES}_{key}.npy",
-                    coords[uuid][key],
-                )
+            match LOCATION:
+                case "server" | "local":
+                    session_folder = ibl._eid2path(eid, one, location=LOCATION)
+                    for key in save_keys:
+                        np.save(
+                            session_folder
+                            / "alf"
+                            / name
+                            / f"mpciMeanImage.mlapdv_repro_ransac_ro_{ATLAS_RES}_{key}.npy",
+                            coords[uuid][key],
+                        )
+                case "popeye":
+                    output_folder = (
+                        Path.home()
+                        / "ibl_scratch"
+                        / "repro"
+                        / one.eid2path(eid).session_path_short()
+                        / "alf"
+                        / name
+                    )
+                    output_folder.mkdir(exist_ok=True, parents=True)
+                    for key in save_keys:
+                        np.save(
+                            output_folder
+                            / f"mpciMeanImage.mlapdv_repro_ransac_ro_{ATLAS_RES}_{key}.npy",
+                            coords[uuid][key],
+                        )
 # %%
