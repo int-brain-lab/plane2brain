@@ -12,7 +12,6 @@ from plane2brain.linalg import (
     plane_normal_form,
     intersect_line_plane,
     intersect_line_mesh_nb,
-    get_closest_face,
 )
 
 from plane2brain.scanimage import create_coordinate_systems_from_scanimage_meta
@@ -57,13 +56,16 @@ def project_coords_onto_atlas_surface(
         tqdm(coords_on_imaging_plane, desc="projecting on surface")
     ):
         try:
-            faces, intersection_points, ix = intersect_line_mesh_nb(
+            _, intersection_points, _ = intersect_line_mesh_nb(
                 atlas.mesh["vertices"],
                 atlas.mesh["edges"],
                 _coords,
                 projection_vector * -1,
             )
-            _, ix = get_closest_face(faces, _coords)
+            # pick the intersection point nearest the imaging-plane point;
+            # face centroid was previously used as a proxy, which can flip
+            # the choice when one face is much more elongated than the other
+            ix = np.argmin(np.linalg.norm(intersection_points - _coords, axis=1))
             coords_on_surface[i] = intersection_points[ix]
         except ValueError:
             # TODO logger warn
