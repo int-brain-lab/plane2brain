@@ -347,36 +347,3 @@ def get_rotation_between_vectors(
         return R
 
 
-def get_vector_angles(
-    v: np.ndarray,
-    in_radians: bool = True,
-) -> np.ndarray:
-    # follows IBL conventions?
-    # TODO verify the angles, again ...
-
-    ml, ap, dv = v
-    # theta is the angle for rotation around the ml axis = in plane in (ap, dv)
-    # == pitch
-
-    a = np.array([ap, dv])
-    b = np.array([0, 1])
-    theta = np.arccos(np.dot(a, b) / (linalg.norm(a) * linalg.norm(b)))
-
-    # phi is the angle for rotation around the dv axis = in plane in (ml, ap)
-    # == yaw
-    a = np.array([ml, ap])
-    b = np.array([1, 0])
-    phi = np.arccos(np.dot(a, b) / (linalg.norm(a) * linalg.norm(b)))
-    # beta is the angle for rotation in AP axis = in plane in (ml, dv)
-    # == roll
-    # not clearly defined in the IBL image (extent)
-
-    a = np.array([ml, dv])
-    b = np.array([0, 1])
-    beta = np.arccos(np.dot(a, b) / (linalg.norm(a) * linalg.norm(b)))
-
-    angles = np.array([phi, theta, beta])
-    if in_radians:
-        return angles
-    else:
-        return angles * 360 / (2 * np.pi)
