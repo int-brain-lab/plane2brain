@@ -24,10 +24,10 @@ from typing import Literal
 # %% whiterussian / local server base folder
 COORDS: Literal["rois", "px"] = "px"
 LOCATION: Literal["server", "local", "popeye"] = "popeye"
-SAVE_OUTPUT: bool = False
-PLOT: bool = True
+SAVE_OUTPUT: bool = True
+PLOT: bool = False
 DEBUG: bool = False
-ATLAS_RES: int = 25
+ATLAS_RES: int = 100
 
 # %%
 """
@@ -64,10 +64,8 @@ if args.session_path is None and args.eid is None:
             eid = one.path2eid(session_path)
         case "popeye":
             session_path = Path(
-                # "/mnt/home/graiser/data/cortexlab/Subjects/SP058/2024-08-01/001"  # the original test case
-                # "/mnt/sdceph/users/ibl/data/cortexlab/Subjects/SP058/2024-07-04/001"  # no ref stack
-                "/mnt/sdceph/users/ibl/data/cortexlab/Subjects/SP058/2024-06-28/001"  # ref stack wrong size but correct animal
-                # "mnt/sdceph/users/ibl/data/cortexlab/Subjects/SP072/2025-08-26/001"  # ref stack of wrong size
+                # "/mnt/home/graiser/data/cortexlab/Subjects/SP058/2024-08-01/001" # the original test case
+                "/mnt/sdceph/users/ibl/data/cortexlab/Subjects/SP058/2024-07-04/001"  # no ref stack
             )
             eid = one.path2eid(session_path)
         case "local":
@@ -176,7 +174,6 @@ ref_img_size_um = ref_img_size_px * um_per_px
 
 # reference session for SP058: "SP058/2024-08-14/001"
 eid_ref = one.ref2eid(dict(subject="SP058", date="2024-08-14", sequence="001"))
-# eid_ref = one.ref2eid(dict(subject="SP072", date="2024-08-14", sequence="001"))
 
 # get the path to the reference stack
 ref_stack_path = ibl.get_reference_stack_path(
@@ -265,7 +262,6 @@ for key, path in zip(
 ):
     # key here: flipping dimensions
     img_data[key] = np.swapaxes(tifffile.imread(path), 1, 2)
-    print(f"{key}:{img_data[key].shape}")
     # img_data[key] = preprocess_vasculature(img_data[key]).astype("int16")
 
 # find and apply transform
@@ -273,13 +269,13 @@ ref_transform, reg_details = register_stacks(
     img_data["stack"],
     img_data["target_stack"],
     transform_type="euclidean",
-    # transform_type="affine",
     return_details=True,
 )
 # NOTE affine is overall actually worse, but better for single plane
+
 img_data["aligned"] = apply_transform(img_data["stack"], ref_transform)
 
-# %% evaluate transform
+# evaluate transform
 ncc_before = evaluate(img_data["stack"], img_data["target_stack"])
 ncc_after = evaluate(img_data["aligned"], img_data["target_stack"])
 
@@ -315,11 +311,10 @@ if PLOT:
     else:
         save_path = None
 
-    z = 8
     plot_keypoints(
         img_data,
         reg_details,
-        z=z,
+        z,
         save_path=save_path,
     )
 

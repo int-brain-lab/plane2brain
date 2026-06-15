@@ -76,20 +76,20 @@ ref_point = ibl.load_reference_points_from_meta(
 raw_imaging_meta, stat_paths, fov_map = ibl.load_fov_data(eid, one, location=LOCATION)
 fov_names = sorted(list(fov_map.keys()))
 
-if COORDS == 'rois':
+if COORDS == "rois":
     coords_px = suite2p.data_loader(
         stat_paths, fov_map, dims=dims
     )  # refactor: rename coords_px
-elif COORDS == 'px':
+elif COORDS == "px":
     coords_px = {}
     if DEBUG:
         n = 5
     else:
         # cannot assert Width == Height because of the format of the FOVs being stitched
         # together vertically (mesoscope specific)
-        n = raw_imaging_meta['rawScanImageMeta']['Width']
+        n = raw_imaging_meta["rawScanImageMeta"]["Width"]
     for name, uuid in fov_map.items():
-        coords_px[uuid] = np.array(list(product(range(n),repeat=2)), dtype='float')
+        coords_px[uuid] = np.array(list(product(range(n), repeat=2)), dtype="float")
 
 # this is the atlas to project onto
 atlas = ProjectionAtlas(res_um=ATLAS_RES)
@@ -255,7 +255,7 @@ params = {
 if PLOT:
     if SAVE_OUTPUT:
         save_path = session_path / "alf" / "_gr_reference_stack_registration.gif"
-    else: 
+    else:
         save_path = None
 
     z = 8
@@ -272,7 +272,7 @@ if PLOT:
 if PLOT:
     if SAVE_OUTPUT:
         save_path = session_path / "alf" / "_gr_registration_keypoints.png"
-    else: 
+    else:
         save_path = None
 
     plot_keypoints(
@@ -344,13 +344,13 @@ for fov_uuid in fov_uuids:
 
 # extract depths
 fov_uuids = sorted(list(fov_map.values()))
-if COORDS == 'rois':
+if COORDS == "rois":
     fov_depths = scanimage.extract_fov_depths_from_scanimage_meta(
         scanimage_meta=raw_imaging_meta["rawScanImageMeta"],
         scanimage_params=raw_imaging_meta["scanImageParams"],
         fov_uuids=fov_uuids,
     )
-if COORDS == 'px':
+if COORDS == "px":
     fov_depths = {uuid: 0 for uuid in fov_uuids}
 
 # get the depth below brain surface by averaging the dv
@@ -364,17 +364,16 @@ p_surface, n_surface, dv_avg = projections.get_brain_surface_normal(
     coordinate_systems_ref,
 )
 # the untilted plane
-if COORDS == 'rois':
+if COORDS == "rois":
     for uuid in fov_uuids:
         n = coords[uuid]["pixel"].shape[0]
         coords[uuid]["dv_below_surface"] = np.ones(n) * np.absolute(
             fov_depths[uuid] - dv_avg
         )
-if COORDS == 'px':
+if COORDS == "px":
     for uuid in fov_uuids:
         n = coords[uuid]["pixel"].shape[0]
         coords[uuid]["dv_below_surface"] = np.zeros(n)
-
 
 
 # %%
@@ -418,14 +417,15 @@ interp_smooth = RegularGridInterpolator(
 # %% plot interpolation
 if PLOT:
     fig, axes = plt.subplots(ncols=2)
-    kwargs = dict(cmap="viridis", vmin=np.percentile(grid, 1), vmax=np.percentile(grid, 99))
+    kwargs = dict(
+        cmap="viridis", vmin=np.percentile(grid, 1), vmax=np.percentile(grid, 99)
+    )
 
     titles = ["ml", "ap"]
     for i in range(2):
         axes[i].matshow(grid[:, :, i], **kwargs)
         axes[i].set_title(titles[i])
         axes[i].axhline(120, color="k", lw=1, alpha=0.5)
-
 
     fig, axes = plt.subplots()
     axes.plot(grid[120, :, 0], label="original")
@@ -559,13 +559,13 @@ p_surface, n_surface, dv_avg = projections.get_brain_surface_normal(
 # extract depths
 fov_uuids = sorted(list(fov_map.values()))
 
-if COORDS == 'rois':
+if COORDS == "rois":
     fov_depths = scanimage.extract_fov_depths_from_scanimage_meta(
         scanimage_meta=raw_imaging_meta["rawScanImageMeta"],
         scanimage_params=raw_imaging_meta["scanImageParams"],
         fov_uuids=fov_uuids,
     )
-if COORDS == 'px':
+if COORDS == "px":
     fov_depths = {uuid: 0 for uuid in fov_uuids}
 
 # this creates: the keys
@@ -594,18 +594,22 @@ if not DEBUG:
         coords[uuid]["on_surface_interp_smooth_s2s_apxy"] = atlas.get_dv_for_mlap(
             mlap_interp
         )
-        if COORDS == 'rois':
+        if COORDS == "rois":
             # project down uncorrected amount
-            coords[uuid]["interp_smooth_s2s_apxy"] = projections.project_down_from_surface(
-                coords_on_surface=coords[uuid]["on_surface_interp_smooth_s2s_apxy"],
-                atlas=atlas,
-                coords_depths=coords[uuid]["dv_below_surface"],
+            coords[uuid]["interp_smooth_s2s_apxy"] = (
+                projections.project_down_from_surface(
+                    coords_on_surface=coords[uuid]["on_surface_interp_smooth_s2s_apxy"],
+                    atlas=atlas,
+                    coords_depths=coords[uuid]["dv_below_surface"],
+                )
             )
             # project down CORRECTED amount
-            coords[uuid]["interp_smooth_s2s_apxyz"] = projections.project_down_from_surface(
-                coords_on_surface=coords[uuid]["on_surface_interp_smooth_s2s_apxy"],
-                atlas=atlas,
-                coords_depths=coords[uuid]["dv_below_surface_corrected"],
+            coords[uuid]["interp_smooth_s2s_apxyz"] = (
+                projections.project_down_from_surface(
+                    coords_on_surface=coords[uuid]["on_surface_interp_smooth_s2s_apxy"],
+                    atlas=atlas,
+                    coords_depths=coords[uuid]["dv_below_surface_corrected"],
+                )
             )
 
 
@@ -621,7 +625,7 @@ if not DEBUG:
   ######  ##     ##    ###    ########     #######   #######     ##    ##         #######     ##    
  
 """
-if COORDS == 'rois':
+if COORDS == "rois":
     save_keys = [
         "indexing",
         "on_surface_interp",
@@ -661,7 +665,7 @@ if COORDS == 'rois':
                     coords[uuid][key],
                 )
 
-if COORDS == 'px':
+if COORDS == "px":
     save_keys = [
         "indexing",
         "on_surface_interp",

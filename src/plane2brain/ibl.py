@@ -21,11 +21,23 @@ def _eid2path(eid: str, one: ONE, location: str = "server") -> Path:
     return session_path
 
 
+def get_fov_map(raw_imaging_meta: dict) -> dict:
+    # our fov names in ascending order
+    fov_names = [f"FOV_0{i}" for i in range(len(raw_imaging_meta["FOV"]))]
+    # TODO glob here on the folder and compare
+    fov_uuids = [meta["roiUUID"] for meta in raw_imaging_meta["FOV"]]
+    # fov_metas = [[meta for meta in scanimage_fov_metas if meta["roiUuid"] == uuid][0] for uuid in fov_uuids]
+    # fov_depths = np.array([meta["zs"] for meta in fov_metas])
+    fov_map = dict(zip(fov_names, fov_uuids))
+    return fov_map
+
+
 def load_fov_data(
     eid: str,
     one: ONE,
     raw_imaging_collection: Optional[str] = None,
     location: str = "server",
+    scratch_dir: Path | None = None,
 ) -> Tuple[dict, Dict[str, Path], Dict[str, str]]:
     # get data
     if raw_imaging_collection is None:
@@ -40,48 +52,47 @@ def load_fov_data(
                 "r",
             ) as fH:
                 raw_imaging_meta = json.load(fH)
-        case "local":
+        case "local" | "popeye":
             raw_imaging_meta = one.load_dataset(
                 eid, "_ibl_rawImagingData.meta.json", collection=raw_imaging_collection
             )
+        case _:
+            raise NotImplementedError
 
-    # get FOV depths from scanimage meta
-    # scanimage_meta = raw_imaging_meta["rawScanImageMeta"]
-    # scanimage_fov_metas = scanimage_meta["Artist"]["RoiGroups"]["imagingRoiGroup"]["rois"]
-
-    # our fov names in ascending order
-    fov_names = [f"FOV_0{i}" for i in range(len(raw_imaging_meta["FOV"]))]
-    # TODO glob here on the folder and compare
-    fov_uuids = [meta["roiUUID"] for meta in raw_imaging_meta["FOV"]]
-    # fov_metas = [[meta for meta in scanimage_fov_metas if meta["roiUuid"] == uuid][0] for uuid in fov_uuids]
-    # fov_depths = np.array([meta["zs"] for meta in fov_metas])
-    fov_map = dict(zip(fov_names, fov_uuids))
+    fov_map = get_fov_map(raw_imaging_meta)
 
     # the paths of the suite2p output
     stat_paths = {}
-    for fov in fov_names:
+    for fov_name, uuid in fov_map.items():
         session_folder = _eid2path(eid, one, location=location)
         match location:
             case "server":
-                zip_path = next((session_folder / "alf" / fov).glob("*ROIData.raw.zip"))
-                stat_path = zip_path.parent / zip_path.stem / "stat.npy"
-                if not stat_path.exists():
-                    # if stat path doesn't exist, extract it
-                    stat_path.parent.mkdir(exist_ok=True)
-                    with zipfile.ZipFile(zip_path, "r") as z:
-                        z.extractall(stat_path.parent)
-                stat_paths[fov] = stat_path
+                zip_path = next(
+                    (session_folder / "alf" / fov_name).glob("*ROIData.raw.zip")
+                )
+            case "popeye":
+                zip_path = next(
+                    (session_folder / "alf" / fov_name).glob("*ROIData.raw.*.zip")
+                )
             case "local":
                 zip_path = one.load_dataset(
-                    eid, "*ROIData.raw.zip", collection=f"alf/{fov}", download_only=True
+                    eid,
+                    "*ROIData.raw.zip",
+                    collection=f"alf/{fov_name}",
+                    download_only=True,
                 )
-                stat_path = zip_path.parent / zip_path.stem / "stat.npy"
-                if not stat_path.exists():
-                    # if stat path doesn't exist, extract it
-                    stat_path.parent.mkdir(exist_ok=True)
-                    with zipfile.ZipFile(zip_path, "r") as z:
-                        z.extractall(stat_path.parent)
-                stat_paths[fov] = stat_path
+
+        if scratch_dir is None:
+            stat_path = zip_path.parent / zip_path.stem / "stat.npy"
+        else:
+            stat_path = scratch_dir / zip_path.stem / "stat.npy"
+
+        if not stat_path.exists():
+            # if stat path doesn't exist, extract it
+            stat_path.parent.mkdir(exist_ok=True, parents=True)
+            with zipfile.ZipFile(zip_path, "r") as z:
+                z.extractall(stat_path.parent)
+        stat_paths[fov_name] = stat_path
 
     return raw_imaging_meta, stat_paths, fov_map
 
@@ -96,20 +107,24 @@ def get_reference_stack_path(
         raw_imaging_collection = infer_imaging_collection(eid, one, location=location)
     session_path = _eid2path(eid, one, location=location)
     match location:
-        case "server":
+        case "server" | "popeye":
             reference_collection = session_path / raw_imaging_collection / "reference"
             filepath = [
                 p
                 for p in reference_collection.glob("*")
                 if "referenceImage.stack" in str(p)
             ]
-            assert len(filepath) == 1, "multiple reference stacks found"
+
+            assert len(filepath) == 1, (
+                f"number of reference stacks is: {len(filepath)} - and has to be exactly 1"
+            )
             filepath = filepath[0]
         case "local":
             filepath = one.load_dataset(
                 eid,
                 "*referenceImage.stack",
                 collection=f"{raw_imaging_collection}/reference",
+                download_only=True,
             )
     return filepath
 
@@ -151,15 +166,24 @@ def load_reference_stack_metadata(
             ]
             assert len(filepath) == 1
             filepath = filepath[0]
-
             with open(filepath, "r") as fH:
                 ref_img_meta = json.load(fH)
         case "local":
+            reference_collection = raw_imaging_collection + "/reference"
             ref_img_meta = one.load_dataset(
                 eid,
                 "*referenceImage.meta",
-                collection=raw_imaging_collection,
+                collection=reference_collection,
             )
+        case "popeye":
+            session_path = _eid2path(eid, one, location=location)
+            reference_collection = session_path / raw_imaging_collection / "reference"
+            filepath = list(reference_collection.glob("*referenceImage.meta.*.json"))
+            assert len(filepath) == 1
+            filepath = filepath[0]
+            with open(filepath, "r") as fH:
+                ref_img_meta = json.load(fH)
+
     return ref_img_meta
 
 
@@ -206,17 +230,17 @@ def infer_imaging_collection(eid: str, one: ONE, location="server") -> str:
                 c for c in raw_imaging_collections if (c / "reference").exists()
             ]
             assert len(collections) == 1, (
-                "multiple imaging collections with reference stack found"
+                f"number of collections with reference stacks is: {len(collections)} - and has to be exactly 1"
             )
             return collections[0].parts[-1]
-        case "local":
+        case "local" | "popeye":
             collections = [
                 c
                 for c in one.list_collections(eid)
                 if "raw_imaging_data" in c and "reference" in c
             ]
             assert len(collections) == 1, (
-                "multiple imaging collections with reference stack found"
+                f"number of collections with reference stacks is: {len(collections)} - and has to be exactly 1"
             )
             return collections[0].split("/")[0]
 
@@ -241,6 +265,16 @@ def load_brain_surface_points(
                 "r",
             ) as fH:
                 brain_surface_points = json.load(fH)
+        case "popeye":
+            ref_points_path = list(
+                (session_path / raw_imaging_collection / "reference").glob(
+                    "referenceImage.points.*.json"
+                )
+            )
+            assert len(ref_points_path) == 1
+            with open(ref_points_path[0], "r") as fH:
+                brain_surface_points = json.load(fH)
+
         case "local":
             datasets = one.list_datasets(
                 eid, collection=f"{raw_imaging_collection}/reference"
@@ -310,7 +344,7 @@ def load_roi_mlapdv(
             path = session_path / "alf" / fov / dataset
             assert path.exists()
             mlapdv = np.load(path)
-        case "local":
+        case "local" | "popeye":
             datasets = one.list_datasets(eid, collection=f"alf/{fov}")
             if f"alf/{fov}/{dataset}" in datasets:
                 mlapdv = one.load_dataset(eid, dataset, collection=f"alf/{fov}")

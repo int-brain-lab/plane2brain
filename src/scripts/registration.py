@@ -51,10 +51,11 @@ def register_stacks(
         Maps moving coords -> reference coords.
         Use sktransform.warp(img, transform.inverse) to resample moving onto ref.
     """
-    if image_stack.shape != ref_image_stack.shape:
-        raise ValueError(
-            f"shape mismatch: {image_stack.shape} vs {ref_image_stack.shape}"
-        )
+    # if image_stack.shape != ref_image_stack.shape:
+    #     image_stack = match_stack_shape(image_stack, ref_image_stack.shape)
+        # raise ValueError(
+        #     f"shape mismatch: {image_stack.shape} vs {ref_image_stack.shape}"
+        # )
 
     orb = cv2.ORB_create(nfeatures=2000)
     matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
@@ -129,6 +130,34 @@ def apply_transform(
     return out
 
 
+import numpy as np
+from scipy.ndimage import zoom
+
+
+def match_stack_shape(stack, target_shape, order=1):
+    """
+    Rescale a (depth, width, height) stack so its width/height match target_shape.
+
+    Parameters
+    ----------
+    stack : np.ndarray
+        Input stack of shape (depth, width, height).
+    target_shape : tuple
+        Desired (width, height) or full (depth, width, height) shape;
+        depth is left unchanged either way.
+    order : int
+        Spline interpolation order (0=nearest, 1=linear, 3=cubic).
+
+    Returns
+    -------
+    np.ndarray of shape (depth, target_width, target_height)
+    """
+    target_w, target_h = target_shape[-2], target_shape[-1]
+    d, w, h = stack.shape
+    factors = (1, target_w / w, target_h / h)
+    return zoom(stack, factors, order=order)
+
+
 ######## ##     ##    ###    ##
 ##       ##     ##   ## ##   ##
 ##       ##     ##  ##   ##  ##
@@ -191,10 +220,13 @@ def inspect_registration_delta(
     figsize: tuple[float, float] = (15, 10),
 ) -> FuncAnimation:
     if not (reference_stack.shape == image_stack.shape == transformed_stack.shape):
-        raise ValueError(
-            f"shape mismatch: image {image_stack.shape}, "
-            f"reference {reference_stack.shape}, transformed {transformed_stack.shape}"
-        )
+        # zoom one to the shape of the other
+        reference_stack = match_stack_shape(reference_stack, image_stack.shape)
+
+        # raise ValueError(
+        #     f"shape mismatch: image {image_stack.shape}, "
+        #     f"reference {reference_stack.shape}, transformed {transformed_stack.shape}"
+        # )
 
     moving = _norm(image_stack[z])
     reference = _norm(reference_stack[z])

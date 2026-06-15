@@ -288,52 +288,57 @@ eid_pairs = list(combinations(eids, 2))
 
 dists = np.zeros((len(ucids), len(eid_pairs)))
 for i, (eid_a, eid_b) in enumerate(eid_pairs):
-    dists[:,i] = df.groupby(['eid_a','eid_b']).get_group((eid_a,eid_b))['dist'].values
+    dists[:, i] = (
+        df.groupby(["eid_a", "eid_b"]).get_group((eid_a, eid_b))["dist"].values
+    )
 
 # %%
 fig, axes = plt.subplots()
 mat = axes.matshow(dists)
-axes.set_aspect('auto')
-plt.colorbar(mat,label='distance (µm)')
-axes.set_ylabel('ROIs')
-axes.set_xlabel('eid combo')
+axes.set_aspect("auto")
+plt.colorbar(mat, label="distance (µm)")
+axes.set_ylabel("ROIs")
+axes.set_xlabel("eid combo")
 
 # %%
-mu = np.average(dists,axis=1)
-sds = np.std(dists,axis=1)
-fig, axes = plt.subplots(figsize=[14,4])
+mu = np.average(dists, axis=1)
+sds = np.std(dists, axis=1)
+fig, axes = plt.subplots(figsize=[14, 4])
 for i in range(len(mu)):
-    axes.plot([i,i],[mu[i]-sds[i],mu[i]+sds[i]],lw=0.1,color='k')
-    axes.plot(i,mu[i], '.', color='k',alpha=0.5)
+    axes.plot([i, i], [mu[i] - sds[i], mu[i] + sds[i]], lw=0.1, color="k")
+    axes.plot(i, mu[i], ".", color="k", alpha=0.5)
 
 sns.despine(fig)
-axes.set_xlabel('ROI')
-axes.set_ylabel('mean dist')
-axes.set_title('per ROI distance, all session pairwise')
+axes.set_xlabel("ROI")
+axes.set_ylabel("mean dist")
+axes.set_title("per ROI distance, all session pairwise")
 
 # %%
-bins = np.linspace(0,100,20)
-dists_hist= np.zeros((len(ucids), len(bins)-1))
+bins = np.linspace(0, 100, 20)
+dists_hist = np.zeros((len(ucids), len(bins) - 1))
 for i in range(len(dists)):
-    dists_hist[i,:] = np.histogram(dists[i,:],bins=bins)[0]
+    dists_hist[i, :] = np.histogram(dists[i, :], bins=bins)[0]
 
 fig, axes = plt.subplots()
-ax = axes.matshow(dists_hist, extent=(bins[0],bins[-1],0,len(ucids)))
-axes.set_aspect('auto')
-plt.colorbar(ax, label='count')
-axes.set_ylabel('ROI')
-axes.set_xlabel('bin')
+ax = axes.matshow(dists_hist, extent=(bins[0], bins[-1], 0, len(ucids)))
+axes.set_aspect("auto")
+plt.colorbar(ax, label="count")
+axes.set_ylabel("ROI")
+axes.set_xlabel("bin")
 
 
 # %%
 # ddf = pd.DataFrame(dists, columns=eid_pairs, index=ucids)
 # sns.barplot(ddf.melt(),hue='variable',y='value',legend=None)
-df['eid_combo'] = [':'.join(e) for e in zip(df['eid_a'].astype('str').values,df['eid_b'].astype('str').values)]
-sns.barplot(df, hue='ucid',y='dist', legend=None)
+df["eid_combo"] = [
+    ":".join(e)
+    for e in zip(df["eid_a"].astype("str").values, df["eid_b"].astype("str").values)
+]
+sns.barplot(df, hue="ucid", y="dist", legend=None)
 ax = plt.gca()
-ax.set_ylabel('distance (µm)')
-ax.set_xlabel('eid combination')
-ax.set_title('per ROI session to session distance')
+ax.set_ylabel("distance (µm)")
+ax.set_xlabel("eid combination")
+ax.set_title("per ROI session to session distance")
 sns.despine(fig)
 
 # %%
