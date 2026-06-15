@@ -240,29 +240,6 @@ def intersect_line_mesh_nb(
     )
 
 
-# @nb.njit("Tuple((float64[:], int64))(float64[:,:,:],float64[:])")
-def get_closest_face(
-    faces: np.ndarray,
-    point: np.ndarray,
-) -> Tuple[np.ndarray, np.intp]:
-    """Find the face closest to a point by comparing face centroid distances.
-
-    Args:
-        faces: Array of shape (N, 3, 3) for N triangular faces.
-        point: Query point, shape (3,).
-
-    Returns:
-        Tuple of (closest face, its index in `faces`).
-    """
-    # calculate distance to all and get minimum
-    dists = np.zeros(faces.shape[0], dtype="float64")
-    for i in range(faces.shape[0]):
-        dists[i] = linalg.norm(point - np.average(faces[i], axis=0))
-
-    min_ix = np.argmin(dists)
-    return faces[min_ix], min_ix
-
-
 # numpy version
 def find_closest_point_from_line_np(
     points: np.ndarray,

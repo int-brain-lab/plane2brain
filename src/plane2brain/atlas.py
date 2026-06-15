@@ -4,7 +4,6 @@ from scipy.spatial import ConvexHull
 from plane2brain.linalg import (
     intersect_line_mesh_np,
     intersect_line_mesh_nb,
-    get_closest_face,
     plane_normal_form,
 )
 from iblatlas.atlas import AllenAtlas
@@ -85,7 +84,9 @@ class ProjectionAtlas(AllenAtlas):
         else:
             func = intersect_line_mesh_np
         faces, ips, _ = func(self.mesh["vertices"], self.mesh["edges"], l0, l)
-        face, ix = get_closest_face(faces, l0)
+        # pick the intersection point nearest the starting point of the ray
+        ix = np.argmin(np.linalg.norm(ips - l0, axis=1))
+        face = faces[ix]
         _, n = plane_normal_form(face)  # the brain normal
         p = ips[ix]  # the intersection point in the mesh triangle
         if upwards:
@@ -109,13 +110,14 @@ class ProjectionAtlas(AllenAtlas):
         for i, _coords in enumerate(coords_mlap):
             _coords = np.append(_coords, 0.0)
             try:
-                faces, intersection_points, ix = intersect_line_mesh_nb(
+                _, intersection_points, _ = intersect_line_mesh_nb(
                     self.mesh["vertices"],
                     self.mesh["edges"],
                     _coords,
                     np.array([0.0, 0.0, -1.0]),
                 )
-                _, ix = get_closest_face(faces, _coords)
+                # pick the intersection point nearest the imaging-plane point
+                ix = np.argmin(np.linalg.norm(intersection_points - _coords, axis=1))
                 coords_mlapdv[i] = intersection_points[ix]
             except ValueError:
                 # TODO logger warn
