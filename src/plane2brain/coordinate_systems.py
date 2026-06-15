@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.axes import Axes
 
-from plane2brain.affine import rotation_matrix_z, apply_transform
+from plane2brain.affine import rotation_matrix_z
 from plane2brain.plotters import plot_line
 
 """
@@ -346,7 +346,10 @@ def coordinate_system_from_normal(
 
     if rotate_by:
         R = rotation_matrix_z(rotate_by)
-        basis = apply_transform(basis, R)
+        # basis vectors are stored as COLUMNS in this module, but
+        # affine.apply_transform interprets its input as Nx3 rows-as-points;
+        # to rotate the column vectors we multiply by R[:3, :3] directly.
+        basis = R[:3, :3] @ basis
 
     if invert_dims is None:
         invert_dims = [False, False, False]

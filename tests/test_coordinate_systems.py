@@ -3,7 +3,11 @@ import unittest
 import numpy as np
 import numpy.testing as nptest
 
-from plane2brain.coordinate_systems import create_coordinate_system_for_image
+from plane2brain.coordinate_systems import (
+    create_coordinate_system_for_image,
+    coordinate_system_from_normal,
+    setup_coordinate_systems_3d,
+)
 
 
 class TestCoordinateSystems(unittest.TestCase):
@@ -63,6 +67,118 @@ class TestCoordinateSystems(unittest.TestCase):
             coordinate_systems.transform((0, 1), "image", "um_image"),
             (0, img_size_um[1]),
         )
+
+
+class TestCoordinateSystemFromNormal(unittest.TestCase):
+    def test_aligned_normal_gives_identity_basis(self):
+        # n = [0,0,1]: DV straight up → basis should be the 3×3 identity
+        p = np.array([1.0, 2.0, 3.0])
+        n = np.array([0.0, 0.0, 1.0])
+        cs = coordinate_system_from_normal(p, n)
+
+        nptest.assert_array_almost_equal(cs.origin, p)
+        nptest.assert_array_almost_equal(cs.basis, np.identity(3))
+
+    def test_dv_axis_equals_normal(self):
+        # for a tilted normal the DV axis (basis[:,2]) must match the normal
+        p = np.zeros(3)
+        angle = np.pi / 6  # 30 degrees
+        n = np.array([0.0, np.sin(angle), np.cos(angle)])
+        cs = coordinate_system_from_normal(p, n)
+
+        nptest.assert_array_almost_equal(cs.basis[:, 2], n)
+
+    def test_ap_axis_has_zero_ml_component(self):
+        # AP axis (basis[:,1]) must have no ML component (index 0 == 0)
+        p = np.zeros(3)
+        n = np.array([0.0, np.sin(np.pi / 6), np.cos(np.pi / 6)])
+        cs = coordinate_system_from_normal(p, n)
+
+        self.assertAlmostEqual(cs.basis[0, 1], 0.0)
+
+    def test_basis_is_orthogonal(self):
+        p = np.zeros(3)
+        n = np.array([0.0, np.sin(np.pi / 4), np.cos(np.pi / 4)])
+        cs = coordinate_system_from_normal(p, n)
+
+        nptest.assert_array_almost_equal(cs.basis.T @ cs.basis, np.identity(3))
+
+    def test_invert_dims_negates_axis(self):
+        p = np.zeros(3)
+        n = np.array([0.0, 0.0, 1.0])
+        cs_default = coordinate_system_from_normal(p, n)
+        cs_inverted = coordinate_system_from_normal(
+            p, n, invert_dims=[True, False, False]
+        )
+
+        # ML axis (col 0) is negated; AP and DV axes are unchanged
+        nptest.assert_array_almost_equal(
+            cs_inverted.basis[:, 0], -cs_default.basis[:, 0]
+        )
+        nptest.assert_array_almost_equal(
+            cs_inverted.basis[:, 1], cs_default.basis[:, 1]
+        )
+        nptest.assert_array_almost_equal(
+            cs_inverted.basis[:, 2], cs_default.basis[:, 2]
+        )
+
+    def test_rotate_by_rotates_ml_ap_columns(self):
+        # for a flat normal, rotate_by=π/2 around DV should send ML→AP and AP→-ML,
+        # leaving the DV column unchanged
+        p = np.zeros(3)
+        n = np.array([0.0, 0.0, 1.0])
+        cs = coordinate_system_from_normal(p, n, rotate_by=np.pi / 2)
+
+        nptest.assert_array_almost_equal(cs.basis[:, 0], [0.0, 1.0, 0.0])
+        nptest.assert_array_almost_equal(cs.basis[:, 1], [-1.0, 0.0, 0.0])
+        nptest.assert_array_almost_equal(cs.basis[:, 2], [0.0, 0.0, 1.0])
+
+    def test_rotate_by_preserves_orthonormal_basis(self):
+        # the previous bug used apply_transform on the column-major basis, which
+        # produced a non-orthogonal basis for tilted normals; verify orthonormality
+        p = np.zeros(3)
+        n = np.array([0.0, np.sin(np.pi / 6), np.cos(np.pi / 6)])
+        cs = coordinate_system_from_normal(p, n, rotate_by=np.pi / 4)
+
+        nptest.assert_array_almost_equal(cs.basis.T @ cs.basis, np.identity(3))
+
+    def test_rotate_by_dv_axis_unchanged_for_flat_normal(self):
+        # rotate_by rotates around DV, so the DV column must be invariant
+        p = np.zeros(3)
+        n = np.array([0.0, 0.0, 1.0])
+        cs_no_rotation = coordinate_system_from_normal(p, n)
+        cs_rotated = coordinate_system_from_normal(p, n, rotate_by=0.7)
+
+        nptest.assert_array_almost_equal(
+            cs_rotated.basis[:, 2], cs_no_rotation.basis[:, 2]
+        )
+
+
+class TestSetupCoordinateSystems3D(unittest.TestCase):
+    def setUp(self):
+        self.center = np.array([100.0, 200.0, 50.0])
+        self.normal = np.array([0.0, 0.0, 1.0])  # flat brain surface
+        self.cs = setup_coordinate_systems_3d(self.center, self.normal)
+
+    def test_mlapdv_is_world_frame(self):
+        nptest.assert_array_almost_equal(self.cs.get("mlapdv").origin, np.zeros(3))
+        nptest.assert_array_almost_equal(self.cs.get("mlapdv").basis, np.identity(3))
+
+    def test_imaging_plane_origin_equals_center(self):
+        nptest.assert_array_almost_equal(
+            self.cs.get("imaging_plane").origin, self.center
+        )
+
+    def test_center_maps_to_origin_in_imaging_plane(self):
+        # the reference point should be at the origin of the imaging_plane system
+        coords_in_plane = self.cs.transform(self.center, "mlapdv", "imaging_plane")
+        nptest.assert_array_almost_equal(coords_in_plane, np.zeros(3))
+
+    def test_round_trip(self):
+        point_in_plane = np.array([10.0, -5.0, 0.0])
+        point_mlapdv = self.cs.transform(point_in_plane, "imaging_plane", "mlapdv")
+        point_back = self.cs.transform(point_mlapdv, "mlapdv", "imaging_plane")
+        nptest.assert_array_almost_equal(point_back, point_in_plane)
 
 
 if __name__ == "__main__":
