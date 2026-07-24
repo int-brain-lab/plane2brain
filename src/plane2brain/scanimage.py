@@ -1,4 +1,5 @@
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 import numpy.testing as nptest
@@ -9,7 +10,7 @@ from plane2brain.coordinate_systems import (
 )
 
 
-def _get_fov_uuids(scanimage_meta: dict[str, Any]) -> List[str]:
+def _get_fov_uuids(scanimage_meta: dict[str, Any]) -> list[str]:
     """Return all ScanImage field-of-view UUIDs from metadata."""
     scanimage_fov_metas = scanimage_meta["Artist"]["RoiGroups"]["imagingRoiGroup"][
         "rois"
@@ -20,7 +21,7 @@ def _get_fov_uuids(scanimage_meta: dict[str, Any]) -> List[str]:
 def get_scanfield_size_ref(
     scanimage_fov_meta: dict[str, Any],
     dims: Sequence[str] = ("X", "Y"),
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Read scanfield size and center from ScanImage FOV metadata.
 
     Args:
@@ -77,7 +78,7 @@ def get_resolution_from_scanimage_meta(
 def get_fov_meta(
     scanimage_meta: dict[str, Any],
     fov_uuid: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Return the metadata block corresponding to the specified FOV UUID."""
     (scanimage_fov_meta,) = [
         meta
@@ -89,9 +90,9 @@ def get_fov_meta(
 
 def create_coordinate_systems_from_scanimage_meta(
     scanimage_meta: dict[str, Any],
-    fov_uuids: Optional[List[str]] = None,
+    fov_uuids: list[str] | None = None,
     dims: Sequence[str] = ("X", "Y"),
-) -> Dict[str, LinkedCoordinateSystems]:
+) -> dict[str, LinkedCoordinateSystems]:
     """Build `LinkedCoordinateSystems` objects for all ScanImage scanfields.
 
     Args:
@@ -108,7 +109,7 @@ def create_coordinate_systems_from_scanimage_meta(
 
     # pixel resolution from metadata
     um_per_px = get_resolution_from_scanimage_meta(scanimage_meta, dims=dims)
-    coordinate_systems: Dict[str, LinkedCoordinateSystems] = {}
+    coordinate_systems: dict[str, LinkedCoordinateSystems] = {}
 
     for fov_uuid in fov_uuids:
         scanimage_fov_meta = get_fov_meta(scanimage_meta, fov_uuid)
@@ -135,7 +136,7 @@ def create_coordinate_systems_from_scanimage_meta(
 
         # (*) to show that sizeXY is in ref space
         # according to the docs: the affine transform to convert pixel coordinates to reference space
-        T_p = np.array(scanimage_fov_meta["scanfields"]["pixelToRefTransform"])
+        np.array(scanimage_fov_meta["scanfields"]["pixelToRefTransform"])
 
         # this will actually fail due to imprecision!
         # np.testing.assert_allclose(
@@ -154,8 +155,8 @@ def create_coordinate_systems_from_scanimage_meta(
 
         # next we need to know what is the size of a pixel in reference space?
         um_per_ref = um_per_px * px_per_ref
-        ref_per_um = 1 / um_per_ref
-        fov_topleft_um = fov_topleft_ref * um_per_ref
+        1 / um_per_ref
+        fov_topleft_ref * um_per_ref
 
         coordinate_system = create_coordinate_system_for_image(
             fov_size_px,
@@ -190,8 +191,8 @@ def create_coordinate_systems_from_scanimage_meta(
 def extract_fov_depths_from_scanimage_meta(
     scanimage_meta: dict[str, Any],
     scanimage_params: dict[str, Any],
-    fov_uuids: Optional[Sequence[str]] = None,
-) -> Dict[str, np.float64]:
+    fov_uuids: Sequence[str] | None = None,
+) -> dict[str, np.float64]:
     """Extract the depth of each ScanImage FOV from metadata.
 
     Args:

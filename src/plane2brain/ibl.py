@@ -1,13 +1,13 @@
-from pathlib import Path
-from typing import Optional, Tuple, Dict, List
-import zipfile
-import tifffile
 import json
-import numpy as np
 import subprocess
+import zipfile
+from pathlib import Path
+
+import numpy as np
+import tifffile
+from one.api import ONE
 
 from plane2brain import scanimage
-from one.api import ONE
 
 # Server-side data root — machine-specific, only used when location="server"
 BASE_FOLDER = Path("/mnt/s0/Data/Subjects")
@@ -35,10 +35,10 @@ def get_fov_map(raw_imaging_meta: dict) -> dict:
 def load_fov_data(
     eid: str,
     one: ONE,
-    raw_imaging_collection: Optional[str] = None,
+    raw_imaging_collection: str | None = None,
     location: str = "server",
     scratch_dir: Path | None = None,
-) -> Tuple[dict, Dict[str, Path], Dict[str, str]]:
+) -> tuple[dict, dict[str, Path], dict[str, str]]:
     # get data
     if raw_imaging_collection is None:
         raw_imaging_collection = infer_imaging_collection(eid, one, location=location)
@@ -63,7 +63,7 @@ def load_fov_data(
 
     # the paths of the suite2p output
     stat_paths = {}
-    for fov_name, uuid in fov_map.items():
+    for fov_name in fov_map:
         session_folder = _eid2path(eid, one, location=location)
         match location:
             case "server":
@@ -100,7 +100,7 @@ def load_fov_data(
 def get_reference_stack_path(
     eid: str,
     one: ONE,
-    raw_imaging_collection: Optional[str] = None,
+    raw_imaging_collection: str | None = None,
     location: str = "server",
 ) -> Path:
     if raw_imaging_collection is None:
@@ -132,7 +132,7 @@ def get_reference_stack_path(
 def load_reference_stack(
     eid: str,
     one: ONE,
-    raw_imaging_collection: Optional[str] = None,
+    raw_imaging_collection: str | None = None,
     location: str = "server",
 ) -> np.ndarray:
     """Load the reference image stack for a session.
@@ -149,7 +149,7 @@ def load_reference_stack(
 def load_reference_stack_metadata(
     eid: str,
     one: ONE,
-    raw_imaging_collection: Optional[str] = None,
+    raw_imaging_collection: str | None = None,
     location: str = "server",
 ) -> dict:
     # load the referenceImage.meta JSON file
@@ -208,7 +208,7 @@ def load_reference_points_from_meta(
 def load_reference_stack_miles(
     eid: str,
     one: ONE,
-    raw_imaging_collection: Optional[str] = None,
+    raw_imaging_collection: str | None = None,
     location: str = "server",
 ) -> np.ndarray:
     """Load reference stack using Miles' loader. Not yet implemented."""
@@ -248,9 +248,9 @@ def infer_imaging_collection(eid: str, one: ONE, location="server") -> str:
 def load_brain_surface_points(
     eid: str,
     one: ONE,
-    raw_imaging_collection: Optional[Path] = None,
+    raw_imaging_collection: Path | None = None,
     location: str = "server",
-) -> Dict:
+) -> dict:
     session_path = _eid2path(eid, one, location)
     if raw_imaging_collection is None:
         raw_imaging_collection = infer_imaging_collection(eid, one, location)
@@ -358,8 +358,8 @@ def load_roi_mlapdv(
 def infer_ref_stack_virtual_corner(
     ref_img_scanimage_meta: dict,
     ref_img_size_px: np.ndarray,  # in 2d (X,Y)
-    dims: Tuple[str, str] = ("X", "Y"),
-) -> Tuple[np.ndarray, np.ndarray]:
+    dims: tuple[str, str] = ("X", "Y"),
+) -> tuple[np.ndarray, np.ndarray]:
     # get the corner of the reference stack in ref space
     # TODO refactor me
     stripes = ref_img_scanimage_meta["Artist"]["RoiGroups"]["imagingRoiGroup"]["rois"]

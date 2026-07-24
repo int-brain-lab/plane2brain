@@ -35,12 +35,18 @@ def _unit_cube_mesh():
     )
     edges = np.array(
         [
-            [0, 1, 2], [0, 2, 3],  # bottom z = -1
-            [4, 5, 6], [4, 6, 7],  # top    z = +1
-            [0, 1, 5], [0, 5, 4],  # front  y = -1
-            [2, 3, 7], [2, 7, 6],  # back   y = +1
-            [0, 3, 7], [0, 7, 4],  # left   x = -1
-            [1, 2, 6], [1, 6, 5],  # right  x = +1
+            [0, 1, 2],
+            [0, 2, 3],  # bottom z = -1
+            [4, 5, 6],
+            [4, 6, 7],  # top    z = +1
+            [0, 1, 5],
+            [0, 5, 4],  # front  y = -1
+            [2, 3, 7],
+            [2, 7, 6],  # back   y = +1
+            [0, 3, 7],
+            [0, 7, 4],  # left   x = -1
+            [1, 2, 6],
+            [1, 6, 5],  # right  x = +1
         ],
         dtype=np.int32,
     )
@@ -50,9 +56,7 @@ def _unit_cube_mesh():
 class TestPlaneNormalForm(unittest.TestCase):
     def test_known_triangle_returns_first_vertex_and_unit_normal(self):
         # xy-plane triangle: normal should be along ±z with unit length
-        face = np.array(
-            [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
-        )
+        face = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
         p0, n = plane_normal_form(face)
         nptest.assert_array_almost_equal(p0, face[0])
         self.assertAlmostEqual(abs(n[2]), 1.0)
@@ -83,9 +87,7 @@ class TestIntersectLinePlane(unittest.TestCase):
 
 class TestPointInFace(unittest.TestCase):
     def test_centroid_is_inside(self):
-        face = np.array(
-            [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
-        )
+        face = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
         centroid = face.mean(axis=0)
         self.assertTrue(bool(point_in_face(face, centroid)))
 
@@ -93,9 +95,7 @@ class TestPointInFace(unittest.TestCase):
         # point_in_face uses strict 0 < w < 1; a vertex has barycentric weight 1
         # on itself and 0 on the others, so it returns False — boundary points
         # are not "inside"
-        face = np.array(
-            [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
-        )
+        face = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
         self.assertFalse(bool(point_in_face(face, face[0])))
 
 
@@ -132,12 +132,8 @@ class TestIntersectLineMesh(unittest.TestCase):
         vertices, edges = _unit_cube_mesh()
         line_point = np.array([0.1, 0.3, -10.0])
         line_vector = np.array([0.0, 0.0, 1.0])
-        _, np_ips, _ = intersect_line_mesh_np(
-            vertices, edges, line_point, line_vector
-        )
-        _, nb_ips, _ = intersect_line_mesh_nb(
-            vertices, edges, line_point, line_vector
-        )
+        _, np_ips, _ = intersect_line_mesh_np(vertices, edges, line_point, line_vector)
+        _, nb_ips, _ = intersect_line_mesh_nb(vertices, edges, line_point, line_vector)
         nptest.assert_array_almost_equal(
             sorted(np_ips[:, 2].tolist()), sorted(nb_ips[:, 2].tolist())
         )

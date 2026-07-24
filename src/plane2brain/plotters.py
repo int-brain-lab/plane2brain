@@ -1,7 +1,6 @@
-from typing import List
-import numpy as np
-import matplotlib.pyplot as plt
 import matplotlib.pyplot as mpl
+import matplotlib.pyplot as plt
+import numpy as np
 
 mpl.rcParams["axes3d.mouserotationstyle"] = "azel"
 
@@ -24,7 +23,7 @@ def plot_triangle(triangle_points, axes=None, **kwargs):
     if "color" not in kwargs:
         kwargs["color"] = "k"
 
-    a, b, c = triangle_points
+    _a, _b, _c = triangle_points
     points = np.concatenate(
         [triangle_points, triangle_points[0, :][np.newaxis, :]], axis=0
     )
@@ -32,7 +31,9 @@ def plot_triangle(triangle_points, axes=None, **kwargs):
     return axes
 
 
-def plot_line(l0, l, length=[-5, 5], axes=None, **kwargs):
+def plot_line(l0, l, length=None, axes=None, **kwargs):
+    if length is None:
+        length = [-5, 5]
     if "color" not in kwargs:
         kwargs["color"] = "k"
 
@@ -121,7 +122,7 @@ def plot_brain_surface_points(
     return axes
 
 
-def extent_from_corners(corners: dict) -> List:
+def extent_from_corners(corners: dict) -> list:
     # as used by matshow
     # (left, right, bottom, top)
     return [

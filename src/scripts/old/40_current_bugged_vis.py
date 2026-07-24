@@ -1,12 +1,9 @@
 # %%
-import sys
-from pathlib import Path
 import numpy as np
-from plane2brain import plotters, projections, scanimage, suite2p, ibl
-from plane2brain.atlas import ProjectionAtlas
 from one.api import ONE
-import matplotlib.pyplot as plt
 
+from plane2brain import ibl, plotters, scanimage, suite2p
+from plane2brain.atlas import ProjectionAtlas
 
 # %% whiterussian / local server base folder
 # BASE_FOLDER = Path("/mnt/s0/Data/Subjects")
@@ -29,14 +26,14 @@ PLOT = False
 """
 
 # this is defined
-scanner_orientation = dict(rotation=0.0, invert_axis=[True, True, False])
+scanner_orientation = {"rotation": 0.0, "invert_axis": [True, True, False]}
 dims = ("Y", "X")
 
 one = ONE()
 
 # NOTE this currently fails in vscode interactive mode
 # eid = one.ref2eid(dict(subject="SP058", date="2024-07-25", sequence="001"))
-eid = one.ref2eid(dict(subject="SP058", date="2024-08-01", sequence="001"))
+eid = one.ref2eid({"subject": "SP058", "date": "2024-08-01", "sequence": "001"})
 session_path = ibl._eid2path(eid, one, location=LOCATION)
 # session_path = Path("/mnt/s0/Data/Subjects/SP058/2024-06-19/001")
 # eid = one.path2eid(session_path)
@@ -50,7 +47,7 @@ ref_point = ibl.load_reference_points_from_meta(
 
 # load the suite2p data
 raw_imaging_meta, stat_paths, fov_map = ibl.load_fov_data(eid, one, location=LOCATION)
-fov_names = sorted(list(fov_map.keys()))
+fov_names = sorted(fov_map.keys())
 coords_px = suite2p.data_loader(stat_paths, fov_map)  # refactor: rename coords_px
 
 # this is the atlas to project onto
@@ -98,7 +95,7 @@ ref_img_size_um = ref_img_size_px * um_per_px
 ##        ########  #######     ##
 
 # %%
-FOVs = [p.parts[-1] for p in sorted(list((session_path / "alf").glob("*FOV*")))]
+FOVs = [p.parts[-1] for p in sorted((session_path / "alf").glob("*FOV*"))]
 mlapdv = {}
 for dataset in [
     "mpciROIs.mlapdv.npy",

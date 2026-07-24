@@ -1,12 +1,12 @@
-from typing import Optional, Tuple, Dict
 import numpy as np
+from iblatlas.atlas import AllenAtlas
 from scipy.spatial import ConvexHull
+
 from plane2brain.linalg import (
-    intersect_line_mesh_np,
     intersect_line_mesh_nb,
+    intersect_line_mesh_np,
     plane_normal_form,
 )
-from iblatlas.atlas import AllenAtlas
 
 
 class ProjectionAtlas(AllenAtlas):
@@ -18,7 +18,7 @@ class ProjectionAtlas(AllenAtlas):
         DV_SCALE = 0.885
         AP_SCALE = 1.031
         kwargs["scaling"] = np.array([ML_SCALE, AP_SCALE, DV_SCALE])
-        self.mesh: Optional[Dict[str, np.ndarray]] = None
+        self.mesh: dict[str, np.ndarray] | None = None
         super().__init__(*args, **kwargs)
         self.compute_surface()
         self.calculate_surface_triangulation()
@@ -28,7 +28,7 @@ class ProjectionAtlas(AllenAtlas):
         points = self.get_surface_points(dropna=True)
         hull = ConvexHull(points)
         connectivity_list = hull.simplices
-        self.mesh = dict(vertices=points, edges=connectivity_list)
+        self.mesh = {"vertices": points, "edges": connectivity_list}
 
     def get_surface_points(self, dropna: bool = True) -> np.ndarray:
         """Return all brain surface points in micrometers.
@@ -60,7 +60,7 @@ class ProjectionAtlas(AllenAtlas):
         ap: float,
         upwards: bool = True,
         numba: bool = False,
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Return the brain surface plane in normal form at a given ML/AP location.
 
         Casts a vertical ray downward from above the brain and finds its intersection
@@ -89,9 +89,8 @@ class ProjectionAtlas(AllenAtlas):
         face = faces[ix]
         _, n = plane_normal_form(face)  # the brain normal
         p = ips[ix]  # the intersection point in the mesh triangle
-        if upwards:
-            if n[2] < 0:
-                n *= -1
+        if upwards and n[2] < 0:
+            n *= -1
         return p, n
 
     def get_dv_for_mlap(
@@ -128,7 +127,7 @@ class ProjectionAtlas(AllenAtlas):
     def get_labels_for_mlapdv(
         self,
         coords_mlapdv: np.ndarray,
-    ) -> Tuple[np.ndarray, list, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, list, np.ndarray, np.ndarray]:
         """Look up Allen Atlas region labels for a set of ML/AP/DV coordinates.
 
         Args:

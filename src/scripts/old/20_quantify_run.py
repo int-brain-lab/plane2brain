@@ -2,14 +2,14 @@
 import sys
 
 sys.path.append("/home/ibladmin/Documents/georg/code/mesoscope/")
-import chronic_data_loader
 from pathlib import Path
-from one.api import ONE
-import pandas as pd
 
+import chronic_data_loader
+import pandas as pd
+from one.api import ONE
 
 with open(Path(__file__).parent / "projected_sessions.txt", "r") as fH:
-    session_paths = [line.strip() for line in fH.readlines()]
+    session_paths = [line.strip() for line in fH]
 
 session_paths = session_paths[:3]
 
@@ -47,8 +47,9 @@ for key in save_keys:
 
 # select_chronic_data_by_roicat_UCIDs
 from itertools import combinations
-import numpy as np
+
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
 
 # chronic_data = chronic_data_est
@@ -125,7 +126,7 @@ fig.suptitle("euclidean distance, averaged over ROIs, all sessions pairwise")
 
 np.nanmean(df.values.flatten())
 # %% the 3d scatterplot
-from plane2brain import plotters, atlas
+from plane2brain import atlas, plotters
 
 atlas = atlas.ProjectionAtlas()
 brain_surface_points = atlas.get_surface_points()

@@ -1,16 +1,14 @@
 """a collection of linear algebra helpers, optimised with numba"""
 
 import warnings
-from typing import Tuple
 
+import numba as nb
 import numpy as np
 from numpy import linalg
 
-import numba as nb
-
 
 @nb.njit("Tuple((float64[:], float64[:]))(float64[:,:])", cache=True)
-def plane_normal_form(face: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+def plane_normal_form(face: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Form a plane from a face (3 points).
 
     Args:
@@ -57,7 +55,6 @@ def intersect_line_plane(
     Returns:
         The intersection point, shape (3,).
     """
-    #
 
     if warn:
         with warnings.catch_warnings(record=True) as w:
@@ -137,7 +134,7 @@ def intersect_line_mesh_np(
     line_vector: np.ndarray,
     numba: bool = False,
     exclude: bool = False,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Calculate the intersection of a line with a triangle mesh.
 
     Args:
@@ -200,7 +197,7 @@ def intersect_line_mesh_nb(
     edges: np.ndarray,
     line_point: np.ndarray,
     line_vector: np.ndarray,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """see intersect_line_mesh_np"""
     N = edges.shape[0]
     vertices_to_check = np.zeros(N, dtype="bool")
@@ -212,7 +209,7 @@ def intersect_line_mesh_nb(
         # to the plane and there is no intersection — skip those faces
         tol = 1e-5
         alpha = get_angle(plane_normal, line_vector)
-        if np.abs((np.abs(alpha) - np.pi / 2)) > tol:
+        if np.abs(np.abs(alpha) - np.pi / 2) > tol:
             face = vertices[edges[i]]
             plane_point, plane_normal = plane_normal_form(face)
             intersection_point = intersect_line_plane_nb(
@@ -322,5 +319,3 @@ def get_rotation_between_vectors(
         return R_
     else:
         return R
-
-

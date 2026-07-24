@@ -1,16 +1,16 @@
 """suite2p specific code"""
 
 from pathlib import Path
-from typing import Dict, Tuple
+
 import numpy as np
 
 
 # this is "kind of" ibl specific
 def data_loader(
-    stat_paths: Dict[str, Path],
-    fov_map: Dict[str, str],
-    dims: Tuple[str, str] = ("X", "Y"),
-) -> Dict[str, np.ndarray]:
+    stat_paths: dict[str, Path],
+    fov_map: dict[str, str],
+    dims: tuple[str, str] = ("X", "Y"),
+) -> dict[str, np.ndarray]:
     coords = {}
     for fov_name, path in stat_paths.items():
         stat = np.load(path, allow_pickle=True)

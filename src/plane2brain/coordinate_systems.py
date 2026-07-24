@@ -1,10 +1,10 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-import numpy as np
-from numpy import linalg
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
 from matplotlib.axes import Axes
+from numpy import linalg
 
 from plane2brain.affine import rotation_matrix_z
 from plane2brain.plotters import plot_line
@@ -58,9 +58,7 @@ class CoordinateSystem:
         """Map points from the world frame into this coordinate system."""
         return (points_w - self.origin) @ linalg.pinv(self.basis.T)
 
-    def plot(
-        self, axes: Optional[Axes] = None, scale: float = 1.0, **kwargs: Any
-    ) -> Axes:
+    def plot(self, axes: Axes | None = None, scale: float = 1.0, **kwargs: Any) -> Axes:
         """Plot the coordinate axes for this system.
 
         Args:
@@ -103,11 +101,11 @@ class LinkedCoordinateSystems:
 
     def __init__(
         self,
-        coordinate_systems: Dict[str, CoordinateSystem],
+        coordinate_systems: dict[str, CoordinateSystem],
     ):
         self.coordinate_systems = coordinate_systems
         # all have the same dim
-        assert len(set([cs.dim for cs in self.coordinate_systems.values()])) == 1
+        assert len({cs.dim for cs in self.coordinate_systems.values()}) == 1
         self.dim = next(iter(self.coordinate_systems.values())).dim
 
     def transform(
@@ -127,7 +125,7 @@ class LinkedCoordinateSystems:
             Coordinates in the target coordinate system.
         """
         for name in [name_from, name_target]:
-            if name not in self.coordinate_systems.keys():
+            if name not in self.coordinate_systems:
                 raise ValueError(
                     f"coordinate system with {name} not found. Present coordinate systems are:",
                     list(self.coordinate_systems.keys()),
@@ -140,7 +138,7 @@ class LinkedCoordinateSystems:
     def plot(
         self,
         scale: float = 1.0,
-        axes: Optional[Axes] = None,
+        axes: Axes | None = None,
         color_by: str = "system",
     ) -> Axes:
         """Plot all linked coordinate systems on a shared axes.
@@ -239,28 +237,28 @@ def create_coordinate_system_for_image(
     # corner is at the location specified by img_topleft ref
 
     coordinate_systems = LinkedCoordinateSystems(
-        dict(
-            ref=CoordinateSystem(
+        {
+            "ref": CoordinateSystem(
                 basis=np.identity(2),
                 origin=np.zeros(2),
             ),
-            pixel=CoordinateSystem(
+            "pixel": CoordinateSystem(
                 basis=np.diag(ref_per_px),
                 origin=img_topleft_ref,
             ),
-            um_image=CoordinateSystem(
+            "um_image": CoordinateSystem(
                 basis=np.diag(ref_per_um),
                 origin=img_topleft_ref,
             ),
-            image=CoordinateSystem(
+            "image": CoordinateSystem(
                 basis=np.diag(ref_per_um * img_size_um),
                 origin=img_topleft_ref,
             ),
-            um_global=CoordinateSystem(
+            "um_global": CoordinateSystem(
                 basis=np.diag(ref_per_um),
                 origin=np.zeros(2),
             ),
-        )
+        }
     )
     return coordinate_systems
 
@@ -269,7 +267,7 @@ def get_image_corners(
     img_size_px: np.ndarray,  # FIXME not needed anymore
     coordinate_systems: LinkedCoordinateSystems,
     to: str = "um_global",  # TODO refactor me to 'in'
-) -> Dict[str, np.ndarray]:
+) -> dict[str, np.ndarray]:
     """Return the corner coordinates of an image in a target coordinate system.
 
     Args:
@@ -281,13 +279,13 @@ def get_image_corners(
         A mapping of corner names to coordinates in the target system.
     """
     img_size_px = np.array(img_size_px)  # cast just in case
-    corners = dict(
-        topleft=[0, 0],
-        topright=[0, 1],
-        bottomleft=[1, 0],
-        bottomright=[1, 1],
-        center=[0.5, 0.5],  # img_size_px / 2, # FIXME this is wrong alos
-    )
+    corners = {
+        "topleft": [0, 0],
+        "topright": [0, 1],
+        "bottomleft": [1, 0],
+        "bottomright": [1, 1],
+        "center": [0.5, 0.5],  # img_size_px / 2, # FIXME this is wrong alos
+    }
     return {
         name: coordinate_systems.transform(np.array(corner), "image", to)
         for name, corner in corners.items()
@@ -310,8 +308,8 @@ def get_image_corners(
 def coordinate_system_from_normal(
     p: np.ndarray,  # point
     n: np.ndarray,  # normal
-    rotate_by: Optional[float] = None,  # around the axis of the normal
-    invert_dims: Optional[List[bool]] = None,
+    rotate_by: float | None = None,  # around the axis of the normal
+    invert_dims: list[bool] | None = None,
 ) -> CoordinateSystem:
     """Create a coordinate system whose DV axis aligns with a given normal.
 
@@ -364,8 +362,8 @@ def coordinate_system_from_normal(
 def setup_coordinate_systems_3d(
     center_mlapdv: np.ndarray,
     brain_normal: np.ndarray,
-    rotate_by: Optional[float] = None,
-    invert_dims: Optional[List[bool]] = None,
+    rotate_by: float | None = None,
+    invert_dims: list[bool] | None = None,
 ) -> LinkedCoordinateSystems:
     """Create a linked set of 3D coordinate systems for imaging.
 
@@ -380,15 +378,15 @@ def setup_coordinate_systems_3d(
         `imaging_plane` coordinate systems.
     """
     cs3d = LinkedCoordinateSystems(
-        dict(
-            mlapdv=CoordinateSystem(basis=np.identity(3), origin=np.zeros(3)),
-            imaging_plane=coordinate_system_from_normal(
+        {
+            "mlapdv": CoordinateSystem(basis=np.identity(3), origin=np.zeros(3)),
+            "imaging_plane": coordinate_system_from_normal(
                 center_mlapdv,
                 brain_normal,
                 rotate_by=rotate_by,
                 invert_dims=invert_dims,
             ),
-        )
+        }
     )
 
     # TODO add tests for the 3d case

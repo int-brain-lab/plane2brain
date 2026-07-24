@@ -2,7 +2,7 @@
 from one.api import ONE
 
 one = ONE()
-eid = one.ref2eid(dict(subject="SP058", date="2024-08-01", sequence="001"))
+eid = one.ref2eid({"subject": "SP058", "date": "2024-08-01", "sequence": "001"})
 raw_imaging_meta = one.load_dataset(
     eid, "raw_imaging_data_02/_ibl_rawImagingData.meta.json"
 )
@@ -16,8 +16,8 @@ brain_surface_points = ref_img_meta["points"]
 # however this discrepancy has little effect on the part below
 
 # %% load locally on whiterussian
-from pathlib import Path
 import json
+from pathlib import Path
 
 session_path = Path("/mnt/s0/Data/Subjects/SP058/2024-08-01/001")
 with open(

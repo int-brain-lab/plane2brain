@@ -1,16 +1,14 @@
 from pathlib import Path
 from typing import Literal
 
-import numpy as np
 import cv2
+import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
+from matplotlib.animation import FuncAnimation, PillowWriter
+from scipy.stats import pearsonr
 from skimage import transform as sktransform
 from skimage.measure import ransac
-from scipy.stats import pearsonr
-
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation, PillowWriter
-
 
 ########  ########  ######   ####  ######  ######## ########     ###    ######## ####  #######  ##    ##
 ##     ## ##       ##    ##   ##  ##    ##    ##    ##     ##   ## ##      ##     ##  ##     ## ###   ##
@@ -53,9 +51,9 @@ def register_stacks(
     """
     # if image_stack.shape != ref_image_stack.shape:
     #     image_stack = match_stack_shape(image_stack, ref_image_stack.shape)
-        # raise ValueError(
-        #     f"shape mismatch: {image_stack.shape} vs {ref_image_stack.shape}"
-        # )
+    # raise ValueError(
+    #     f"shape mismatch: {image_stack.shape} vs {ref_image_stack.shape}"
+    # )
 
     orb = cv2.ORB_create(nfeatures=2000)
     matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
@@ -105,12 +103,12 @@ def register_stacks(
     )
     # print(f"{inliers.sum()}/{len(inliers)} inliers across all planes")
     if return_details:
-        return model, dict(
-            src=source_points,
-            dst=destination_points,
-            inliers=inliers,
-            zs=z_indices,
-        )
+        return model, {
+            "src": source_points,
+            "dst": destination_points,
+            "inliers": inliers,
+            "zs": z_indices,
+        }
     else:
         return model
 
@@ -153,7 +151,7 @@ def match_stack_shape(stack, target_shape, order=1):
     np.ndarray of shape (depth, target_width, target_height)
     """
     target_w, target_h = target_shape[-2], target_shape[-1]
-    d, w, h = stack.shape
+    _d, w, h = stack.shape
     factors = (1, target_w / w, target_h / h)
     return zoom(stack, factors, order=order)
 
@@ -351,11 +349,11 @@ def plot_keypoints(
     image_concatenated = np.concatenate(
         [_norm(img_data["stack"][z]), _norm(img_data["target_stack"][z])], axis=1
     )
-    image_kwargs = dict(
-        vmin=np.percentile(image_concatenated, 5),
-        vmax=np.percentile(image_concatenated, 99),
-        cmap="gray",
-    )
+    image_kwargs = {
+        "vmin": np.percentile(image_concatenated, 5),
+        "vmax": np.percentile(image_concatenated, 99),
+        "cmap": "gray",
+    }
     axes.matshow(image_concatenated, **image_kwargs)
 
     # lines between keypoints

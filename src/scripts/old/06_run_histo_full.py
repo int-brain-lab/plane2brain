@@ -1,21 +1,19 @@
 # %%
 import sys
+from pathlib import Path
+
 import numpy as np
-from plane2brain import plotters, projections, scanimage, suite2p, ibl
+import skimage
+from iblatlas.atlas import MRITorontoAtlas
+from ibllib.mpci.registration import register_reference_stacks
+from ibllib.mpci.tasks import MesoscopeFOVHistology
+from one.api import ONE
+
+from plane2brain import ibl, projections, scanimage, suite2p
+from plane2brain.atlas import ProjectionAtlas
 from plane2brain.coordinate_systems import (
     create_coordinate_system_for_image,
 )
-
-from plane2brain.atlas import ProjectionAtlas
-from one.api import ONE
-import matplotlib.pyplot as plt
-
-from ibllib.mpci.registration import register_reference_stacks
-from ibllib.mpci.tasks import MesoscopeFOVHistology
-from iblatlas.atlas import MRITorontoAtlas
-
-import skimage
-from pathlib import Path
 
 # %% whiterussian / local server base folder
 BASE_FOLDER = Path("/mnt/s0/Data/Subjects")
@@ -38,14 +36,14 @@ PLOT = False
 """
 
 # this is defined
-scanner_orientation = dict(rotation=0.0, invert_axis=[True, True, False])
+scanner_orientation = {"rotation": 0.0, "invert_axis": [True, True, False]}
 dims = ("Y", "X")
 
 one = ONE()
 if len(sys.argv) == 1:
     # NOTE this currently fails in vscode interactive mode
     # eid = one.ref2eid(dict(subject="SP058", date="2024-07-25", sequence="001"))
-    eid = one.ref2eid(dict(subject="SP058", date="2024-08-01", sequence="001"))
+    eid = one.ref2eid({"subject": "SP058", "date": "2024-08-01", "sequence": "001"})
     session_path = ibl._eid2path(eid, one, location=LOCATION)
 else:
     session_path = Path(sys.argv[1])
@@ -59,7 +57,7 @@ ref_point = ibl.load_reference_points_from_meta(
 
 # load the suite2p data
 raw_imaging_meta, stat_paths, fov_map = ibl.load_fov_data(eid, one, location=LOCATION)
-fov_names = sorted(list(fov_map.keys()))
+fov_names = sorted(fov_map.keys())
 coords_px = suite2p.data_loader(
     stat_paths, fov_map, dims=dims
 )  # refactor: rename coords_px
@@ -121,7 +119,7 @@ ref_img_size_um = ref_img_size_px * um_per_px
 # we take the translation component to integrate it here by shifting the ref point
 
 # reference session for SP058: "SP058/2024-08-14/001"
-eid_ref = one.ref2eid(dict(subject="SP058", date="2024-08-14", sequence="001"))
+eid_ref = one.ref2eid({"subject": "SP058", "date": "2024-08-14", "sequence": "001"})
 
 # get the path to the reference stack
 ref_stack_path = ibl.get_reference_stack_path(
@@ -189,7 +187,7 @@ ref_transform = skimage.transform.EuclideanTransform(
 # session_shift_um = transform_params["translation"] * um_per_px
 
 # %% setting up the coordinate systems for the imaged fovs
-fov_uuids = sorted(list(fov_map.values()))
+fov_uuids = sorted(fov_map.values())
 coordinate_systems_2d = scanimage.create_coordinate_systems_from_scanimage_meta(
     raw_imaging_meta["rawScanImageMeta"],
     fov_uuids=fov_uuids,
@@ -220,7 +218,7 @@ coordinate_systems_ref = create_coordinate_system_for_image(
 
 # %% setting up coords dict
 coords = {}
-fov_uuids = sorted(list(coords_px.keys()))
+fov_uuids = sorted(coords_px.keys())
 for fov_uuid in fov_uuids:
     coords[fov_uuid] = {}
     # get the pixel data
@@ -235,7 +233,7 @@ for fov_uuid in fov_uuids:
     coords[fov_uuid]["um_global"] = _coords_um
 
 # extract depths
-fov_uuids = sorted(list(fov_map.values()))
+fov_uuids = sorted(fov_map.values())
 fov_depths = scanimage.extract_fov_depths_from_scanimage_meta(
     scanimage_meta=raw_imaging_meta["rawScanImageMeta"],
     scanimage_params=raw_imaging_meta["scanImageParams"],
@@ -270,8 +268,8 @@ for uuid in fov_uuids:
 
 # helper function for linear interpolation
 import numpy as np
-from scipy.ndimage import gaussian_filter
 from scipy.interpolate import RegularGridInterpolator
+from scipy.ndimage import gaussian_filter
 
 grid = ref_img_histo_mlapdv[:, :, :-1]
 
@@ -298,7 +296,7 @@ interp_smooth = RegularGridInterpolator(
 )
 
 # %% first: just indexing
-for fov_name, uuid in fov_map.items():
+for uuid in fov_map.values():
     # global px
     px = coords_px[uuid]
     coords_um_global = coordinate_systems_2d[uuid].transform(px, "pixel", "um_global")
@@ -312,7 +310,7 @@ for fov_name, uuid in fov_map.items():
 
 
 # %% second: using interpolation
-for fov_name, uuid in fov_map.items():
+for uuid in fov_map.values():
     # global px
     px = coords_px[uuid]
     coords_um_global = coordinate_systems_2d[uuid].transform(px, "pixel", "um_global")
@@ -332,7 +330,7 @@ for fov_name, uuid in fov_map.items():
     )
 
 # %% third: with session to session shift, no smoothing
-for fov_name, uuid in fov_map.items():
+for uuid in fov_map.values():
     # global pixel
     px = coords_px[uuid]
     coords_um_global = coordinate_systems_2d[uuid].transform(px, "pixel", "um_global")
@@ -354,7 +352,7 @@ for fov_name, uuid in fov_map.items():
 
 # %% next: same as before, but with smoothed grid for interpolation
 
-for fov_name, uuid in fov_map.items():
+for uuid in fov_map.values():
     # global pixel
     px = coords_px[uuid]
     coords_um_global = coordinate_systems_2d[uuid].transform(px, "pixel", "um_global")
@@ -399,7 +397,7 @@ p_surface, n_surface, dv_avg = projections.get_brain_surface_normal(
 )
 
 # extract depths
-fov_uuids = sorted(list(fov_map.values()))
+fov_uuids = sorted(fov_map.values())
 fov_depths = scanimage.extract_fov_depths_from_scanimage_meta(
     scanimage_meta=raw_imaging_meta["rawScanImageMeta"],
     scanimage_params=raw_imaging_meta["scanImageParams"],
@@ -415,7 +413,7 @@ coords = projections.correct_coords_for_tilt_2d(
     n_surface,
 )
 
-for fov_name, uuid in fov_map.items():
+for uuid in fov_map.values():
     # use the um_corrected to transform back to px
     px = coordinate_systems_ref.transform(
         coords[uuid]["um_corrected"], "um_global", "pixel"

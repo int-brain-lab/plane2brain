@@ -1,15 +1,13 @@
 # %%
 from pathlib import Path
 
-import numpy as np
-from one.api import ONE
-
-import plane2brain.ibl as ibl
-
 import matplotlib.pyplot as plt
-
+import numpy as np
 import skimage
 from ibllib.mpci.registration import register_reference_stacks
+from one.api import ONE
+
+from plane2brain import ibl
 
 # %% whiterussian / local server base folder
 BASE_FOLDER = Path("/mnt/s0/Data/Subjects")
@@ -32,7 +30,7 @@ LOCATION = "server"
 """
 
 one = ONE()
-eid_ref = one.ref2eid(dict(subject="SP058", date="2024-08-14", sequence="001"))
+eid_ref = one.ref2eid({"subject": "SP058", "date": "2024-08-14", "sequence": "001"})
 session_refs = [
     # "SP058/2024-06-18/002",
     "SP058/2024-06-19/001",

@@ -4,16 +4,17 @@
 # mpl.rcParams['figure.dpi'] = 300
 
 # %%
+import matplotlib.pyplot as plt
 import numpy as np
-from plane2brain import plotters, projections, scanimage, suite2p, ibl
+from one.api import ONE
+
+from plane2brain import ibl, plotters, projections, scanimage, suite2p
+from plane2brain.atlas import ProjectionAtlas
 from plane2brain.coordinate_systems import (
-    setup_coordinate_systems_3d,
     create_coordinate_system_for_image,
     get_image_corners,
+    setup_coordinate_systems_3d,
 )
-from plane2brain.atlas import ProjectionAtlas
-from one.api import ONE
-import matplotlib.pyplot as plt
 
 # %% whiterussian / local server base folder
 # BASE_FOLDER = Path("/mnt/s0/Data/Subjects")
@@ -35,12 +36,12 @@ PLOT = True
 """
 
 # this is defined
-scanner_orientation = dict(rotation=0.0, invert_axis=[True, True, False])
+scanner_orientation = {"rotation": 0.0, "invert_axis": [True, True, False]}
 dims = ("Y", "X")
 
 one = ONE()
 # eid = one.ref2eid(dict(subject="SP058", date="2024-07-25", sequence="001"))
-eid = one.ref2eid(dict(subject="SP058", date="2024-08-01", sequence="001"))
+eid = one.ref2eid({"subject": "SP058", "date": "2024-08-01", "sequence": "001"})
 
 # load the reference image metadata
 ref_img_meta = ibl.load_reference_stack_metadata(eid, one, location=LOCATION)
@@ -50,7 +51,7 @@ ref_point = ibl.load_reference_points_from_meta(
 
 # load the suite2p data
 raw_imaging_meta, stat_paths, fov_map = ibl.load_fov_data(eid, one, location=LOCATION)
-fov_names = sorted(list(fov_map.keys()))
+fov_names = sorted(fov_map.keys())
 coords_px = suite2p.data_loader(stat_paths, fov_map)  # refactor: rename coords_px
 
 # this is the atlas to project onto
@@ -113,12 +114,12 @@ corners = get_image_corners(ref_img_size_px, coordinate_systems_ref, to="um_glob
 extent = plotters.extent_from_corners(corners)
 fig, axes = plt.subplots()
 
-image_kwargs = dict(
-    extent=plotters.extent_from_corners(corners),
-    cmap="viridis",
-    vmin=np.percentile(ref_img_stack, 0.1),
-    vmax=np.percentile(ref_img_stack, 99.5),
-)
+image_kwargs = {
+    "extent": plotters.extent_from_corners(corners),
+    "cmap": "viridis",
+    "vmin": np.percentile(ref_img_stack, 0.1),
+    "vmax": np.percentile(ref_img_stack, 99.5),
+}
 axes.matshow(ref_img_stack[5, :], **image_kwargs)
 
 # plotting the image corners
@@ -137,7 +138,7 @@ cs_stripes = scanimage.create_coordinate_systems_from_scanimage_meta(
     ref_img_meta["rawScanImageMeta"], dims=dims
 )
 edges = ["topleft", "topright", "bottomright", "bottomleft", "topleft"]
-for uuid in cs_stripes.keys():
+for uuid in cs_stripes:
     scanimage_fov_meta = scanimage.get_fov_meta(ref_img_meta["rawScanImageMeta"], uuid)
     fov_stripe_size_px = scanimage.get_scanfield_size_px(scanimage_fov_meta, dims=dims)
     corners = get_image_corners(fov_stripe_size_px, cs_stripes[uuid], to="um_global")
@@ -188,7 +189,7 @@ cs_stripes = scanimage.create_coordinate_systems_from_scanimage_meta(
     ref_img_meta["rawScanImageMeta"],
     dims=dims,
 )
-for uuid in cs_stripes.keys():
+for uuid in cs_stripes:
     scanimage_fov_meta = scanimage.get_fov_meta(ref_img_meta["rawScanImageMeta"], uuid)
     fov_stripe_size_px = scanimage.get_scanfield_size_px(scanimage_fov_meta, dims=dims)
     corners = get_image_corners(fov_stripe_size_px, cs_stripes[uuid], to="um_global")
@@ -211,16 +212,16 @@ for k, v in corners.items():
         np.append(v, 0), "imaging_plane", "mlapdv"
     )[:-1]  # drop DV
 
-image_kwargs = dict(
-    extent=plotters.extent_from_corners(corners),
-    cmap="gray",
-    vmin=np.percentile(ref_img_stack, 5),
-    vmax=np.percentile(ref_img_stack, 99.9),
-)
+image_kwargs = {
+    "extent": plotters.extent_from_corners(corners),
+    "cmap": "gray",
+    "vmin": np.percentile(ref_img_stack, 5),
+    "vmax": np.percentile(ref_img_stack, 99.9),
+}
 axes.matshow(ref_img_stack[6, :], **image_kwargs)
 
 axes.set_aspect("equal")
-line_kwargs = dict(linestyle=":", lw=1, alpha=1, color="r")
+line_kwargs = {"linestyle": ":", "lw": 1, "alpha": 1, "color": "r"}
 axes.axhline(0, **line_kwargs)
 axes.axvline(0, **line_kwargs)
 circle_center = ref_point["mlap_adjusted"][::-1]
@@ -283,7 +284,7 @@ for p in brain_surface_points_px:
 axes = plotters.plot_brain_surface_points(atlas.get_surface_points())
 coordinate_systems_3d.plot(axes=axes, color_by="axis", scale=500)
 
-uuids = sorted(list(fov_map.values()))
+uuids = sorted(fov_map.values())
 coordinate_systems_fovs = scanimage.create_coordinate_systems_from_scanimage_meta(
     raw_imaging_meta["rawScanImageMeta"],
     fov_uuids=uuids,
@@ -303,11 +304,11 @@ for uuid, coordinate_system in coordinate_systems_fovs.items():
 
 # %%
 coords = {}
-for fov_name, uuid in fov_map.items():
+for uuid in fov_map.values():
     coords[uuid] = {}
 
 # %%
-for fov_name, uuid in fov_map.items():
+for uuid in fov_map.values():
     px = coords_px[uuid][:, ::-1]
     coords_um_global = coordinate_systems_fovs[uuid].transform(px, "pixel", "um_global")
     coords_um_global = np.concatenate(
@@ -322,7 +323,7 @@ for fov_name, uuid in fov_map.items():
 axes = plotters.plot_brain_surface_points(atlas.get_surface_points())
 # axes.view_init(elev=60, azim=-20)
 axes.view_init(elev=90, azim=0)
-for fov_name, uuid in fov_map.items():
+for uuid in fov_map.values():
     plotters.plot_points(coords[uuid]["mlapdv_plane"], axes=axes, s=1)
 
 # axes.set_xlim(0, 4000)
@@ -330,7 +331,7 @@ for fov_name, uuid in fov_map.items():
 
 # %%
 fig, axes = plt.subplots()
-for fov_name, uuid in fov_map.items():
+for uuid in fov_map.values():
     axes.scatter(*coords[uuid]["mlapdv_plane"][:, :-1].T, s=1)
 
 # %%
@@ -401,7 +402,7 @@ coordinate_systems_3d_adjusted = setup_coordinate_systems_3d(
 """
 
 # %% setting up the coordinate systems for the imaged fovs
-fov_uuids = sorted(list(fov_map.values()))
+fov_uuids = sorted(fov_map.values())
 coordinate_systems_2d = scanimage.create_coordinate_systems_from_scanimage_meta(
     raw_imaging_meta["rawScanImageMeta"],
     fov_uuids=fov_uuids,
@@ -418,7 +419,7 @@ coords = projections.project_scanimage_fovs(
 )
 
 # extract depths
-fov_uuids = sorted(list(fov_map.values()))
+fov_uuids = sorted(fov_map.values())
 fov_depths = scanimage.extract_fov_depths_from_scanimage_meta(
     scanimage_meta=raw_imaging_meta["rawScanImageMeta"],
     scanimage_params=raw_imaging_meta["scanImageParams"],
@@ -485,7 +486,7 @@ axes = plotters.plot_brain_surface_points(atlas.get_surface_points())
 coordinate_systems_3d.plot(axes=axes, color_by="axis", scale=500)
 coordinate_systems_3d_adjusted.plot(axes=axes, color_by="axis", scale=500)
 
-uuids = sorted(list(fov_map.values()))
+uuids = sorted(fov_map.values())
 coordinate_systems_fovs = scanimage.create_coordinate_systems_from_scanimage_meta(
     raw_imaging_meta["rawScanImageMeta"],
     fov_uuids=uuids,

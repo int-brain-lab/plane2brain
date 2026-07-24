@@ -3,22 +3,17 @@
 import numpy as np
 from tqdm import tqdm
 
+from plane2brain.atlas import ProjectionAtlas
 from plane2brain.coordinate_systems import (
     LinkedCoordinateSystems,
     setup_coordinate_systems_3d,
 )
-
 from plane2brain.linalg import (
-    plane_normal_form,
-    intersect_line_plane,
     intersect_line_mesh_nb,
+    intersect_line_plane,
+    plane_normal_form,
 )
-
 from plane2brain.scanimage import create_coordinate_systems_from_scanimage_meta
-
-from plane2brain.atlas import ProjectionAtlas
-
-from typing import Tuple, Dict
 
 """
  
@@ -41,7 +36,7 @@ def project_coords_onto_atlas_surface(
 ) -> np.ndarray:
     # coordinate_systems_3d needs to contain imaging_plane and mlapdv
     assert all(
-        key in coordinate_systems_3d.coordinate_systems.keys()
+        key in coordinate_systems_3d.coordinate_systems
         for key in ["imaging_plane", "mlapdv"]
     )
 
@@ -95,7 +90,7 @@ def setup_coordinate_systems_from_scanimage_meta(
     atlas: ProjectionAtlas,
     scanner_orientation: dict,
     fov_uuids: list[str],
-) -> Tuple[LinkedCoordinateSystems, LinkedCoordinateSystems]:
+) -> tuple[LinkedCoordinateSystems, LinkedCoordinateSystems]:
     # and creating the coordinate system
     # TODO integrate ref point 0,0 differences
     # ref_point_mlap == craniotomy center
@@ -119,15 +114,15 @@ def setup_coordinate_systems_from_scanimage_meta(
 
 
 def project_scanimage_fovs(
-    coords_px: Dict[str, np.ndarray],
-    coordinate_systems_2d: Dict[str, LinkedCoordinateSystems],
+    coords_px: dict[str, np.ndarray],
+    coordinate_systems_2d: dict[str, LinkedCoordinateSystems],
     coordinate_systems_3d: LinkedCoordinateSystems,
     atlas: ProjectionAtlas,
     projection_vector: np.ndarray,
     ds: int = 1,
-) -> Dict[str, Dict[str, np.ndarray]]:
+) -> dict[str, dict[str, np.ndarray]]:
     coords_projected = {}
-    fov_uuids = sorted(list(coords_px.keys()))
+    fov_uuids = sorted(coords_px.keys())
     for fov_uuid in fov_uuids:
         coords_projected[fov_uuid] = {}
         # get the pixel data
@@ -166,10 +161,10 @@ def project_scanimage_fovs(
 
 
 def get_brain_surface_normal(
-    reference_brain_surface_points: Dict,
+    reference_brain_surface_points: dict,
     ref_img_meta: dict,
     coordinate_systems_ref: LinkedCoordinateSystems,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Calculate a plane approximating the brain surface from user-selected reference points.
 
     Args:
@@ -230,12 +225,12 @@ def get_brain_surface_normal(
 
 
 def correct_coords_for_tilt_2d(
-    coords: Dict[str, Dict[str, np.ndarray]],  # uuid -> pixel etc
+    coords: dict[str, dict[str, np.ndarray]],  # uuid -> pixel etc
     # coordinate_systems: Dict[str, LinkedCoordinateSystems],
-    fov_depths: Dict[str, np.float64],
+    fov_depths: dict[str, np.float64],
     p_surface: np.ndarray,
     n_surface: np.ndarray,
-) -> Dict[str, Dict[str, np.ndarray]]:
+) -> dict[str, dict[str, np.ndarray]]:
     """Correct cell coordinates for the tilt between the brain surface and optical axis.
 
     When the brain surface is tilted relative to the optical axis, cells in
@@ -289,11 +284,11 @@ def correct_coords_for_tilt_2d(
 
 
 def reproject_coords(  # FIXME refactor
-    coords: Dict[str, Dict[str, np.ndarray]],
+    coords: dict[str, dict[str, np.ndarray]],
     coordinate_systems_3d: LinkedCoordinateSystems,
     atlas: ProjectionAtlas,
     projection_vector: np.ndarray,
-) -> Dict[str, Dict[str, np.ndarray]]:
+) -> dict[str, dict[str, np.ndarray]]:
     for uuid in list(coords.keys()):
         coords_on_surface = project_coords_onto_atlas_surface(
             coords[uuid]["um_corrected"],

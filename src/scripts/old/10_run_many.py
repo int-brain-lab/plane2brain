@@ -1,6 +1,6 @@
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 BASE_FOLDER = Path("/mnt/s0/Data/Subjects")
 session_paths = [

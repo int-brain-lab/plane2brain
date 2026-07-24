@@ -39,9 +39,7 @@ class TestApplyTransform(unittest.TestCase):
         # apply(apply(p, T), inv(T)) == p
         points = np.array([[5.0, -3.0, 7.0]])
         T = rotation_matrix_x(0.3) @ translation_matrix(2.0, 1.0, -1.0)
-        round_trip = apply_transform(
-            apply_transform(points, T), np.linalg.inv(T)
-        )
+        round_trip = apply_transform(apply_transform(points, T), np.linalg.inv(T))
         nptest.assert_array_almost_equal(round_trip, points)
 
 
@@ -63,11 +61,7 @@ class TestRotationMatrices(unittest.TestCase):
 
     def test_rotation_orthogonal_and_unit_determinant(self):
         # R @ R.T == I and det(R[:3,:3]) == 1
-        R = (
-            rotation_matrix_x(0.3)
-            @ rotation_matrix_y(0.5)
-            @ rotation_matrix_z(0.7)
-        )
+        R = rotation_matrix_x(0.3) @ rotation_matrix_y(0.5) @ rotation_matrix_z(0.7)
         nptest.assert_array_almost_equal(R @ R.T, np.identity(4))
         self.assertAlmostEqual(np.linalg.det(R[:3, :3]), 1.0)
 

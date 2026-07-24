@@ -2,15 +2,16 @@
 import sys
 
 sys.path.append("/home/ibladmin/Documents/georg/code/mesoscope/")
-import chronic_data_loader
-from pathlib import Path
-from one.api import ONE
-import pandas as pd
 import sys
 from itertools import combinations
-import numpy as np
+from pathlib import Path
+
+import chronic_data_loader
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import seaborn as sns
+from one.api import ONE
 
 SAVE = False
 # WHEN = "early"
@@ -22,7 +23,7 @@ WHICH = "deep"
 
 # %%
 with open(Path(__file__).parent / "projected_sessions.txt", "r") as fH:
-    session_paths = [line.strip() for line in fH.readlines()]
+    session_paths = [line.strip() for line in fH]
 match WHEN:
     case "early":
         session_paths = session_paths[:5]
@@ -147,12 +148,12 @@ for key in save_keys:
     for eid_a, eid_b in combinations(eids, 2):
         a = mlapdv_chronic[key][eid_a].values
         b = mlapdv_chronic[key][eid_b].values
-        vals = dict(
-            key=key,
-            eid_a=eid_a,
-            eid_b=eid_b,
-            mean_dist=np.mean(np.sqrt(np.sum((a - b) ** 2, 1))),
-        )
+        vals = {
+            "key": key,
+            "eid_a": eid_a,
+            "eid_b": eid_b,
+            "mean_dist": np.mean(np.sqrt(np.sum((a - b) ** 2, 1))),
+        }
         res.append(vals)
 
 df = pd.DataFrame(res, columns=["key", "eid_a", "eid_b", "mean_dist"])

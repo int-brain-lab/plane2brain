@@ -4,8 +4,8 @@ import numpy as np
 import numpy.testing as nptest
 
 from plane2brain.coordinate_systems import (
-    create_coordinate_system_for_image,
     coordinate_system_from_normal,
+    create_coordinate_system_for_image,
     setup_coordinate_systems_3d,
 )
 

@@ -1,8 +1,9 @@
 # %%
 from pathlib import Path
+
+import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-import matplotlib.pyplot as plt
 
 df = pd.read_csv(Path(__file__).parent / "quantify_all_runs.csv")
 

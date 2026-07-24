@@ -2,27 +2,21 @@
 from pathlib import Path
 
 import numpy as np
-
-from plane2brain import projections
-
-from plane2brain.atlas import ProjectionAtlas
-
-from plane2brain.scanimage import (
-    get_resolution_from_scanimage_meta,
-    extract_fov_depths_from_scanimage_meta,
-)
-from plane2brain.coordinate_systems import (
-    setup_coordinate_systems_3d,
-    create_coordinate_system_for_ref,
-)
-from one.api import ONE
-
-import plane2brain.ibl as ibl
-from plane2brain.suite2p import suite2p_data_loader
-
-
 import skimage
 from ibllib.mpci.registration import register_reference_stacks
+from one.api import ONE
+
+from plane2brain import ibl, projections
+from plane2brain.atlas import ProjectionAtlas
+from plane2brain.coordinate_systems import (
+    create_coordinate_system_for_ref,
+    setup_coordinate_systems_3d,
+)
+from plane2brain.scanimage import (
+    extract_fov_depths_from_scanimage_meta,
+    get_resolution_from_scanimage_meta,
+)
+from plane2brain.suite2p import suite2p_data_loader
 
 # %% whiterussian / local server base folder
 BASE_FOLDER = Path("/mnt/s0/Data/Subjects")
@@ -46,7 +40,7 @@ LOCATION = "server"
 load the suite2p data
 """
 one = ONE()
-eid = one.ref2eid(dict(subject="SP058", date="2024-07-25", sequence="001"))
+eid = one.ref2eid({"subject": "SP058", "date": "2024-07-25", "sequence": "001"})
 # eid = one.ref2eid(dict(subject="SP058", date="2024-08-01", sequence="001"))
 
 # load the reference image metadata
@@ -60,11 +54,11 @@ ref_point_mlap, ref_point_ref = ibl.get_reference_points_from_meta(
 raw_imaging_meta, stat_paths, fov_map = ibl.ibl_load_fov_data(
     eid, one, location=LOCATION
 )
-fov_names = sorted(list(fov_map.keys()))
+fov_names = sorted(fov_map.keys())
 coords_px = suite2p_data_loader(stat_paths, fov_map)  # rename coords_px
 
 # this is unfortunately defined
-scanner_orientation = dict(rotation=3 / 2 * np.pi, invert_axis=[True, False, False])
+scanner_orientation = {"rotation": 3 / 2 * np.pi, "invert_axis": [True, False, False]}
 
 # this is the atlas to project onto
 atlas = ProjectionAtlas(res_um=50)
@@ -72,7 +66,7 @@ atlas = ProjectionAtlas(res_um=50)
 # %% integrating histology information from a reference session
 
 # reference session for SP058: "SP058/2024-08-14/001"
-eid_ref = one.ref2eid(dict(subject="SP058", date="2024-08-14", sequence="001"))
+eid_ref = one.ref2eid({"subject": "SP058", "date": "2024-08-14", "sequence": "001"})
 
 # get the path to the reference stack
 ref_stack_path = ibl.ibl_get_reference_stack_path(
@@ -159,7 +153,7 @@ coordinate_systems_ref = create_coordinate_system_for_ref(
 # ref_img_center_um = get_image_corners(ref_img_size_px, coordinate_systems_ref)["center"]
 
 # %% setting up the coordinate systems for the imaged fovs
-fov_uuids = sorted(list(fov_map.values()))
+fov_uuids = sorted(fov_map.values())
 
 # this gets the dv component for the ref point, as well as the brain normal at that
 # location
@@ -237,7 +231,7 @@ p_surface, n_surface, dv_avg = projections.get_brain_surface_normal(
     coordinate_systems_ref,
 )
 
-fov_uuids = sorted(list(fov_map.values()))
+fov_uuids = sorted(fov_map.values())
 fov_depths = extract_fov_depths_from_scanimage_meta(
     raw_imaging_meta["rawScanImageMeta"],
     raw_imaging_meta["scanImageParams"],

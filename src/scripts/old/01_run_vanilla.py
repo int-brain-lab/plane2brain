@@ -1,13 +1,13 @@
 # %%
 import numpy as np
-from plane2brain import plotters, projections, scanimage, suite2p, ibl
-from plane2brain.coordinate_systems import (
-    setup_coordinate_systems_3d,
-    get_image_corners,
-)
-from plane2brain.atlas import ProjectionAtlas
 from one.api import ONE
-import matplotlib.pyplot as plt
+
+from plane2brain import ibl, plotters, projections, scanimage, suite2p
+from plane2brain.atlas import ProjectionAtlas
+from plane2brain.coordinate_systems import (
+    get_image_corners,
+    setup_coordinate_systems_3d,
+)
 
 # %% whiterussian / local server base folder
 # BASE_FOLDER = Path("/mnt/s0/Data/Subjects")
@@ -30,12 +30,12 @@ PLOT = True
 """
 
 # this is defined
-scanner_orientation = dict(rotation=0.0, invert_axis=[True, True, False])
+scanner_orientation = {"rotation": 0.0, "invert_axis": [True, True, False]}
 dims = ("Y", "X")
 
 one = ONE()
 # eid = one.ref2eid(dict(subject="SP058", date="2024-07-25", sequence="001"))
-eid = one.ref2eid(dict(subject="SP058", date="2024-08-01", sequence="001"))
+eid = one.ref2eid({"subject": "SP058", "date": "2024-08-01", "sequence": "001"})
 
 # load the reference image metadata
 ref_img_meta = ibl.load_reference_stack_metadata(eid, one, location=LOCATION)
@@ -45,7 +45,7 @@ ref_point = ibl.load_reference_points_from_meta(
 
 # load the suite2p data
 raw_imaging_meta, stat_paths, fov_map = ibl.load_fov_data(eid, one, location=LOCATION)
-fov_names = sorted(list(fov_map.keys()))
+fov_names = sorted(fov_map.keys())
 coords_px = suite2p.data_loader(stat_paths, fov_map)  # refactor: rename coords_px
 
 # this is the atlas to project onto
@@ -65,7 +65,7 @@ atlas = ProjectionAtlas(res_um=50)
 
 
 # %% setting up the coordinate systems for the imaged fovs
-fov_uuids = sorted(list(fov_map.values()))
+fov_uuids = sorted(fov_map.values())
 
 # the 2d coordinate systems, by fov name
 coordinate_systems_2d = scanimage.create_coordinate_systems_from_scanimage_meta(
@@ -102,7 +102,7 @@ coords = projections.project_scanimage_fovs(
 # %% projecting down from surface
 
 # extract depths
-fov_uuids = sorted(list(fov_map.values()))
+fov_uuids = sorted(fov_map.values())
 fov_depths = scanimage.extract_fov_depths_from_scanimage_meta(
     scanimage_meta=raw_imaging_meta["rawScanImageMeta"],
     scanimage_params=raw_imaging_meta["scanImageParams"],
@@ -144,7 +144,7 @@ for name, uuid in fov_map.items():
 axes = plotters.plot_brain_surface_points(atlas.get_surface_points())
 coordinate_systems_3d.plot(axes=axes, color_by="axis", scale=500)
 
-uuids = sorted(list(fov_map.values()))
+uuids = sorted(fov_map.values())
 coordinate_systems_fovs = scanimage.create_coordinate_systems_from_scanimage_meta(
     raw_imaging_meta["rawScanImageMeta"],
     fov_uuids=uuids,

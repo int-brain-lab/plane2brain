@@ -1,10 +1,11 @@
 # %%
 from pathlib import Path
-import numpy as np
+
 import matplotlib.pyplot as plt
+import numpy as np
 
 session_folder = Path.home() / "ibl_scratch/repro/SP058/2024-07-24/001"
-fov_folders = sorted(list((session_folder / "alf").glob("FOV_*")))
+fov_folders = sorted((session_folder / "alf").glob("FOV_*"))
 
 # %%
 fov_data = {}

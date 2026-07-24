@@ -1,29 +1,31 @@
 # %%
-from typing import List
-from pathlib import Path
 import pickle
 from itertools import product
+from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
-
-from plane2brain import plotters, projections
-
-from plane2brain.brain_meshes import (
-    get_labels_for_mlapdv,
-    get_surface_points,
-    calculate_surface_triangulation,
-    get_plane_at_point_mlap,
-)
-from plane2brain.scanimage import get_resolution_from_scanimage_meta, extract_fov_depths_from_scanimage_meta
-from plane2brain.coordinate_systems import create_coordinate_system_for_ref, get_image_corners, setup_coordinate_systems_3d
-from one.api import ONE
-
 from iblatlas.atlas import MRITorontoAtlas
+from one.api import ONE
+from plane2brain.brain_meshes import (
+    calculate_surface_triangulation,
+    get_labels_for_mlapdv,
+    get_plane_at_point_mlap,
+    get_surface_points,
+)
 
 import plane2brain.ibl as p2bi
-import matplotlib.pyplot as plt
+from plane2brain import plotters, projections
+from plane2brain.coordinate_systems import (
+    create_coordinate_system_for_ref,
+    get_image_corners,
+    setup_coordinate_systems_3d,
+)
+from plane2brain.scanimage import (
+    extract_fov_depths_from_scanimage_meta,
+    get_resolution_from_scanimage_meta,
+)
 from plane2brain.suite2p import suite2p_data_loader
-
 
 BASE_FOLDER = Path("/mnt/s0/Data/Subjects")
 
@@ -48,14 +50,18 @@ raw_imaging_collection = p2bi.infer_imaging_collection(eid, one)
 ref_img_meta = p2bi.ibl_load_reference_stack_metadata(eid, one)
 # TODO refactor me as this could be confusing
 # or later down reference_points == surface_points
-ref_point_mlap, ref_point_ref = p2bi.get_reference_points_from_meta(ref_img_meta, use_resolved=False)  # the craniotomy center
-raw_imaging_meta, stat_paths, fov_map = p2bi.ibl_load_fov_data(eid, raw_imaging_collection, one)
-fov_names = sorted(list(fov_map.keys()))
+ref_point_mlap, ref_point_ref = p2bi.get_reference_points_from_meta(
+    ref_img_meta, use_resolved=False
+)  # the craniotomy center
+raw_imaging_meta, stat_paths, fov_map = p2bi.ibl_load_fov_data(
+    eid, raw_imaging_collection, one
+)
+fov_names = sorted(fov_map.keys())
 coords_px = suite2p_data_loader(stat_paths, fov_map)
 
 # rename coords_px
 # this is unfortunately defined
-scanner_orientation = dict(rotation=3 / 2 * np.pi, invert_axis=[True, False, False])
+scanner_orientation = {"rotation": 3 / 2 * np.pi, "invert_axis": [True, False, False]}
 
 
 # %%
@@ -73,12 +79,14 @@ scanner_orientation = dict(rotation=3 / 2 * np.pi, invert_axis=[True, False, Fal
 
 # NOTE that coords[uuid] is holding arrays of Nx? (Nx2 for 2d coords, Nx3 for 3d coords, Nx1 or Nx4 for others)
 
-coords, coordinate_systems, coordinate_systems_3d = projections.project_from_scanimage_meta(
-    coords_px,
-    scanimage_meta=raw_imaging_meta["rawScanImageMeta"],
-    scanner_orientation=scanner_orientation,
-    common_point_mlap=ref_point_mlap,
-    ds=100,  # TODO remove this debug flag
+coords, coordinate_systems, coordinate_systems_3d = (
+    projections.project_from_scanimage_meta(
+        coords_px,
+        scanimage_meta=raw_imaging_meta["rawScanImageMeta"],
+        scanner_orientation=scanner_orientation,
+        common_point_mlap=ref_point_mlap,
+        ds=100,  # TODO remove this debug flag
+    )
 )
 
 # %% map anything mlapdv to brain area
@@ -92,7 +100,7 @@ for name, uuid in fov_map.items():
 
 # %% some diagnostic plotting
 fig, axes = plt.subplots()
-fov_uuids = sorted(list(coords.keys()))
+fov_uuids = sorted(coords.keys())
 for name, uuid in fov_map.items():
     stat = np.load(stat_paths[name], allow_pickle=True)
     # _coords = np.stack([(np.average(s["xpix"]), np.average(s["ypix"])) for s in stat])
@@ -102,7 +110,7 @@ for name, uuid in fov_map.items():
     axes.scatter(*coords_um.T, c=coords[uuid]["atlas_rgba"] / 255)
 
 axes.set_aspect("equal")
-kwargs = dict(linestyle=":", lw=1, alpha=1, color="k")
+kwargs = {"linestyle": ":", "lw": 1, "alpha": 1, "color": "k"}
 axes.axhline(0, **kwargs)
 axes.axvline(0, **kwargs)
 circle = plt.Circle((0, 0), 3000, fill=False, color="k")
@@ -142,10 +150,14 @@ ref_img_stack = p2bi.ibl_load_reference_stack(eid, one)
 ref_img_meta = p2bi.ibl_load_reference_stack_metadata(eid, one)
 ref_img_size_px = np.array(ref_img_stack[0].shape)
 
-um_per_px = get_resolution_from_scanimage_meta(ref_img_meta["rawScanImageMeta"])  # in X,Y
+um_per_px = get_resolution_from_scanimage_meta(
+    ref_img_meta["rawScanImageMeta"]
+)  # in X,Y
 ref_img_size_um = ref_img_size_px * um_per_px
 
-ref_point_mlap, ref_point_ref = p2bi.get_reference_points_from_meta(ref_img_meta, use_resolved=False)  # the craniotomy center
+ref_point_mlap, ref_point_ref = p2bi.get_reference_points_from_meta(
+    ref_img_meta, use_resolved=False
+)  # the craniotomy center
 
 # MAJOR TODO - deal with the entire situation of the reference image and it's axis
 # we do plus here instead of minus because of the image axis inversion
@@ -164,9 +176,13 @@ atlas.compute_surface()
 brain_surface_points = get_surface_points(atlas)
 mesh = calculate_surface_triangulation(atlas)
 
-ref_point_mlapdv, brain_normal_at_ref = get_plane_at_point_mlap(*ref_point_mlap, mesh, numba=True)
+ref_point_mlapdv, brain_normal_at_ref = get_plane_at_point_mlap(
+    *ref_point_mlap, mesh, numba=True
+)
 # FIXME and here we don't rotate ...
-coordinate_systems_3d = setup_coordinate_systems_3d(ref_point_mlapdv, brain_normal_at_ref, rotate_by=None)
+coordinate_systems_3d = setup_coordinate_systems_3d(
+    ref_point_mlapdv, brain_normal_at_ref, rotate_by=None
+)
 
 
 # %% the coordinates of the individual pixels
@@ -193,7 +209,7 @@ with open(Path(__file__).parent / "reference_image_coords.pkl", "rb") as fH:
 # %% revert the product
 
 
-def extent_from_corners(corners: dict) -> List:
+def extent_from_corners(corners: dict) -> list:
     return [
         corners["topleft"][1],
         corners["topright"][1],
@@ -245,7 +261,7 @@ p_surface, n_surface, dv_avg = projections.get_brain_surface_normal(
     coordinate_systems_ref,
 )
 
-fov_uuids = sorted(list(fov_map.values()))
+fov_uuids = sorted(fov_map.values())
 fov_depths = extract_fov_depths_from_scanimage_meta(
     raw_imaging_meta["rawScanImageMeta"],
     raw_imaging_meta["scanImageParams"],
@@ -253,12 +269,14 @@ fov_depths = extract_fov_depths_from_scanimage_meta(
 )
 
 # %%
-coords, coordinate_systems, coordinate_systems_3d = projections.project_from_scanimage_meta(
-    coords_px,  # this is what is read from suite2p
-    scanimage_meta=raw_imaging_meta["rawScanImageMeta"],
-    scanner_orientation=scanner_orientation,
-    common_point_mlap=ref_point_mlap,
-    ds=10,  # FIXME DEBUGING
+coords, coordinate_systems, coordinate_systems_3d = (
+    projections.project_from_scanimage_meta(
+        coords_px,  # this is what is read from suite2p
+        scanimage_meta=raw_imaging_meta["rawScanImageMeta"],
+        scanner_orientation=scanner_orientation,
+        common_point_mlap=ref_point_mlap,
+        ds=10,  # FIXME DEBUGING
+    )
 )
 
 # %%
@@ -271,7 +289,9 @@ coords = projections.correct_coords_for_tilt_2d(
 )
 
 # %% this is the reprojection
-coords = projections.reproject_coords(coords, coordinate_systems_3d, mesh, brain_normal_at_ref)
+coords = projections.reproject_coords(
+    coords, coordinate_systems_3d, mesh, brain_normal_at_ref
+)
 
 # %% diagnostic plots
 axes = plotters.plot_brain_surface_points(brain_surface_points)
@@ -290,7 +310,9 @@ for name, uuid in fov_map.items():
     _coords = coords[uuid]["pixel"]
     coords_um = coordinate_systems[uuid].transform(_coords, "pixel", "um_global")
     print(name, np.average(coords_um - coords[uuid]["um_corrected"], axis=0))
-    print(name, np.average((dv_avg - fov_depths[uuid]) - coords[uuid]["dv_below_surface"]))
+    print(
+        name, np.average((dv_avg - fov_depths[uuid]) - coords[uuid]["dv_below_surface"])
+    )
 
 # %%
 """

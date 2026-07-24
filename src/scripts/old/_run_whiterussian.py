@@ -1,30 +1,23 @@
 # %%
-from typing import List
-from pathlib import Path
 import pickle
 from itertools import product
+from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
+from one.api import ONE
 
-from plane2brain import plotters, projections
-
+from plane2brain import ibl, plotters, projections
 from plane2brain.atlas import ProjectionAtlas
-
-from plane2brain.scanimage import (
-    get_resolution_from_scanimage_meta,
-    extract_fov_depths_from_scanimage_meta,
-)
 from plane2brain.coordinate_systems import (
     create_coordinate_system_for_ref,
     get_image_corners,
     setup_coordinate_systems_3d,
 )
-from one.api import ONE
-
-from iblatlas.atlas import MRITorontoAtlas
-
-import plane2brain.ibl as ibl
-import matplotlib.pyplot as plt
+from plane2brain.scanimage import (
+    extract_fov_depths_from_scanimage_meta,
+    get_resolution_from_scanimage_meta,
+)
 from plane2brain.suite2p import suite2p_data_loader
 
 # import skimage
@@ -61,7 +54,7 @@ reference_session = the session that is used as the target for the transform
 
 
 one = ONE()
-eid = one.ref2eid(dict(subject="SP058", date="2024-08-01", sequence="001"))
+eid = one.ref2eid({"subject": "SP058", "date": "2024-08-01", "sequence": "001"})
 # eid_ref = "0d957352-4b9e-43c4-8a2c-02f5db69bca1"
 # eid = "0d957352-4b9e-43c4-8a2c-02f5db69bca1"
 
@@ -75,12 +68,12 @@ ref_point_mlap, ref_point_ref = ibl.get_reference_points_from_meta(
 raw_imaging_meta, stat_paths, fov_map = ibl.ibl_load_fov_data(
     eid, one, location=LOCATION
 )
-fov_names = sorted(list(fov_map.keys()))
+fov_names = sorted(fov_map.keys())
 coords_px = suite2p_data_loader(stat_paths, fov_map)
 
 # rename coords_px
 # this is unfortunately defined
-scanner_orientation = dict(rotation=3 / 2 * np.pi, invert_axis=[True, False, False])
+scanner_orientation = {"rotation": 3 / 2 * np.pi, "invert_axis": [True, False, False]}
 
 atlas = ProjectionAtlas(res_um=50)
 
@@ -136,7 +129,7 @@ for name, uuid in fov_map.items():
 
 # %% some diagnostic plotting
 fig, axes = plt.subplots()
-fov_uuids = sorted(list(coords.keys()))
+fov_uuids = sorted(coords.keys())
 for name, uuid in fov_map.items():
     stat = np.load(stat_paths[name], allow_pickle=True)
     # _coords = np.stack([(np.average(s["xpix"]), np.average(s["ypix"])) for s in stat])
@@ -146,7 +139,7 @@ for name, uuid in fov_map.items():
     axes.scatter(*coords_um.T, c=coords[uuid]["atlas_rgba"] / 255)
 
 axes.set_aspect("equal")
-kwargs = dict(linestyle=":", lw=1, alpha=1, color="k")
+kwargs = {"linestyle": ":", "lw": 1, "alpha": 1, "color": "k"}
 axes.axhline(0, **kwargs)
 axes.axvline(0, **kwargs)
 circle = plt.Circle((0, 0), 3000, fill=False, color="k")
@@ -245,7 +238,7 @@ with open(Path(__file__).parent / "reference_image_coords.pkl", "rb") as fH:
 # %% revert the product
 
 
-def extent_from_corners(corners: dict) -> List:
+def extent_from_corners(corners: dict) -> list:
     return [
         corners["topleft"][1],
         corners["topright"][1],
@@ -303,7 +296,7 @@ p_surface, n_surface, dv_avg = projections.get_brain_surface_normal(
     coordinate_systems_ref,
 )
 
-fov_uuids = sorted(list(fov_map.values()))
+fov_uuids = sorted(fov_map.values())
 fov_depths = extract_fov_depths_from_scanimage_meta(
     raw_imaging_meta["rawScanImageMeta"],
     raw_imaging_meta["scanImageParams"],
