@@ -172,3 +172,4 @@ pdm.lock
 # own additions
 src/scripts/_*
 CLAUDE.md
+.vscode/

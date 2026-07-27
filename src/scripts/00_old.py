@@ -264,7 +264,8 @@ ref_img_histo_mlapdv = (
 
 # %% reimplementation of stack image registration
 import tifffile
-from registration import (
+
+from plane2brain.registration import (
     apply_transform,
     evaluate,
     inspect_registration_delta,
@@ -480,7 +481,9 @@ interp_smooth = RegularGridInterpolator(
 if PLOT:
     fig, axes = plt.subplots(ncols=2)
     kwargs = {
-        "cmap": "viridis", "vmin": np.percentile(grid, 1), "vmax": np.percentile(grid, 99)
+        "cmap": "viridis",
+        "vmin": np.percentile(grid, 1),
+        "vmax": np.percentile(grid, 99),
     }
 
     titles = ["ml", "ap"]

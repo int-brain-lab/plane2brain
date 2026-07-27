@@ -2,6 +2,7 @@ import json
 import subprocess
 import zipfile
 from pathlib import Path
+from typing import Literal
 
 import numpy as np
 import tifffile
@@ -11,6 +12,7 @@ from plane2brain import scanimage
 
 # Server-side data root — machine-specific, only used when location="server"
 BASE_FOLDER = Path("/mnt/s0/Data/Subjects")
+BASE_FOLDER_POPEYE = Path("/mnt/sdceph/users/ibl/data/Subjects")
 
 
 def _eid2path(eid: str, one: ONE, location: str = "server") -> Path:
@@ -384,3 +386,44 @@ def infer_ref_stack_virtual_corner(
     ref_per_px = (ref_img_bottomright_ref - ref_img_topleft_ref) / ref_img_size_px
 
     return ref_img_topleft_ref, ref_per_px
+
+
+def infer_reference_session(subject: str) -> str:
+    # this function should return the eid of the session
+    # that was used for the alignment of the histology.
+    # skip implementation for now
+    ...
+
+
+def _validate_eid_and_session_path(
+    eid: str,
+    session_folder: str | Path,
+    one: ONE,
+    location: Literal["server", "local", "popeye"] = "server",
+) -> bool:
+    match location:
+        case "server":
+            base_folder = BASE_FOLDER
+        case "popeye":
+            base_folder = BASE_FOLDER_POPEYE
+        case "local":
+            raise NotImplementedError
+
+    session_folder_inferred = base_folder / one.eid2path(eid).session_path_short()
+    if session_folder != session_folder_inferred:
+        raise ValueError(
+            f"eid and session folder mismatch: {eid}, {session_folder} != {session_folder_inferred}"
+        )
+
+
+def infer_possible_corrections(
+    eid: str | None,
+    session_path: str | Path | None,
+    one: ONE,
+    location: str = "server",
+) -> dict[str, bool]:
+    one = one if one is not None else ONE()  # not ideal
+
+
+# files necessary for the reprojection
+# and how to get them with the data loader
