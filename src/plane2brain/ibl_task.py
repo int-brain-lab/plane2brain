@@ -30,7 +30,16 @@ _logger = logging.getLogger(__name__)
 
 
 class ReprojectionTask(MesoscopeTask):
-    """development of the reprojection task"""
+    """Assign MLAPDV brain coordinates to the pixels of a mesoscope session's reference stack.
+
+    The session's reference stack is registered to the reference stack of a *reference session*
+    of the same subject. Only that reference session has been aligned to histology, so the
+    resulting image transform carries the atlas coordinates over to the current session.
+
+    Notes
+    -----
+    This task is under development: `_run` is still a no-op and the output signature is not final.
+    """
 
     priority = 100
     io_charge = 100
@@ -49,8 +58,22 @@ class ReprojectionTask(MesoscopeTask):
     ):
         """Initialize the task with FOV and reference session identifiers.
 
-        Infers raw imaging collections for both the current and reference
-        session if not given explicitly.
+        Parameters
+        ----------
+        *args : tuple
+            Positional arguments forwarded to `MesoscopeTask`; the first is the session path.
+        FOV : str, optional
+            Name of the field of view to process. If None, all FOVs are considered.
+        reference_session_path : str or pathlib.Path
+            Session path of the histology-aligned reference session of the same subject.
+        one : one.api.ONE, optional
+            An online ONE instance. A new one is created if not given.
+        raw_imaging_collection : str, optional
+            Raw imaging collection of this session. Inferred if not given.
+        reference_session_raw_imaging_collection : str, optional
+            Raw imaging collection of the reference session. Inferred if not given.
+        **kwargs : dict
+            Keyword arguments forwarded to `MesoscopeTask`.
         """
         self.one = one or ONE()
         assert not self.one.offline
@@ -99,6 +122,23 @@ class ReprojectionTask(MesoscopeTask):
         return signature
 
     def validate_reference_session(self, reference_session_eid: str | UUID) -> UUID:
+        """Check that the reference session belongs to the same subject as this session.
+
+        Parameters
+        ----------
+        reference_session_eid : str or uuid.UUID
+            Experiment ID of the candidate reference session.
+
+        Returns
+        -------
+        uuid.UUID
+            The validated experiment ID, unchanged.
+
+        Raises
+        ------
+        AssertionError
+            If the reference session was recorded from a different subject.
+        """
         assert (
             self.one.eid2ref(reference_session_eid)["subject"]
             == self.one.eid2ref(self.eid)["subject"]
@@ -107,9 +147,18 @@ class ReprojectionTask(MesoscopeTask):
 
     @staticmethod
     def infer_raw_imaging_collection(session_path: str | Path) -> str:
-        """Find the raw imaging collection containing reference measurements.
+        """Find the raw imaging collection that contains a reference stack.
 
-        If multiple matching collections exist, the last one is chosen.
+        Parameters
+        ----------
+        session_path : str or pathlib.Path
+            Path of the session to search.
+
+        Returns
+        -------
+        str
+            Name of the raw imaging collection, e.g. 'raw_imaging_data_00'. If several
+            collections hold a reference folder, the last one is returned.
         """
         assert session_path.exists()
         collections = [
@@ -125,7 +174,13 @@ class ReprojectionTask(MesoscopeTask):
         return collections[-1].parts[-1]
 
     def load_imaging_metadata(self) -> dict:
-        """Load the IBL-specific raw imaging metadata JSON."""
+        """Load the raw imaging metadata of this session.
+
+        Returns
+        -------
+        dict
+            Contents of `_ibl_rawImagingData.meta.json`.
+        """
         metadata_filepath = (
             self.session_path
             / self.raw_imaging_collection
@@ -134,7 +189,18 @@ class ReprojectionTask(MesoscopeTask):
         return json.loads(Path(metadata_filepath).read_text(encoding="utf-8"))
 
     def load_reference_stack_metadata(self) -> dict:
-        """Load the IBL metadata JSON of the reference stack."""
+        """Load the metadata of this session's reference stack.
+
+        Returns
+        -------
+        dict
+            Contents of `referenceImage.meta.json`.
+
+        Raises
+        ------
+        AssertionError
+            If not exactly one metadata file is found.
+        """
         reference_collection = (
             self.session_path / self.raw_imaging_collection / "reference"
         )
@@ -144,15 +210,27 @@ class ReprojectionTask(MesoscopeTask):
         return json.loads(Path(filepath[0]).read_text(encoding="utf-8"))
 
     def get_reference_stack_path(self) -> Path:
-        """Return the path to the reference stack of the current session."""
-        # check if this is necessary or if it can be folded with the function below
+        """Return the path to the reference stack of this session.
+
+        Returns
+        -------
+        pathlib.Path
+            Path of the `referenceImage.stack` tif.
+        """
+        # TODO check whether this can be folded into the method below
         return self._get_ref_stack_path(self.session_path, self.raw_imaging_collection)
 
     def get_reference_session_reference_stack_path(self) -> Path:
         """Return the path to the reference stack of the reference session.
-        this also deals with the fact that datasets need to be sym linked
-        to the quarantine folder on popeye"""
 
+        On popeye the stack is not directly readable and is symlinked into the task
+        quarantine folder first.
+
+        Returns
+        -------
+        pathlib.Path
+            Path of the `referenceImage.stack` tif, or of its symlink when on popeye.
+        """
         if self.location == "popeye":
             return self._symlink_reference_stack()
         else:
@@ -164,7 +242,25 @@ class ReprojectionTask(MesoscopeTask):
     def _get_ref_stack_path(
         self, session_path: Path, raw_imaging_collection: str
     ) -> Path:
-        """Find the reference stack file within a session's raw imaging collection."""
+        """Find the reference stack file within a session's raw imaging collection.
+
+        Parameters
+        ----------
+        session_path : pathlib.Path
+            Path of the session to search.
+        raw_imaging_collection : str
+            Name of the raw imaging collection holding the reference folder.
+
+        Returns
+        -------
+        pathlib.Path
+            Path of the `referenceImage.stack` tif.
+
+        Raises
+        ------
+        AssertionError
+            If not exactly one reference stack is found.
+        """
         path = session_path / raw_imaging_collection / "reference"
         filepath = list(path.glob("*referenceImage.stack*"))
 
@@ -174,16 +270,38 @@ class ReprojectionTask(MesoscopeTask):
         return filepath[0]
 
     def load_reference_stack(self) -> np.ndarray:
-        # load the reference stack
+        """Load the reference stack of this session.
+
+        Returns
+        -------
+        numpy.ndarray
+            Image stack with shape (Z, Y, X).
+        """
         return tifffile.imread(self.get_reference_stack_path())
 
     def load_reference_session_reference_stack(self) -> np.ndarray:
-        # load the reference stack of the reference session
+        """Load the reference stack of the reference session.
+
+        Returns
+        -------
+        numpy.ndarray
+            Image stack with shape (Z, Y, X).
+        """
         return tifffile.imread(self.get_reference_session_reference_stack_path())
 
     def _symlink_reference_stack(self) -> None:
-        """creates the symlink necessary for running the task on popeye and returns the
-        link path."""
+        """Symlink the reference session's reference stack into the popeye quarantine folder.
+
+        Returns
+        -------
+        pathlib.Path
+            Path of the created symlink. An existing symlink is replaced.
+
+        Raises
+        ------
+        AssertionError
+            If not exactly one reference stack is found in the source folder.
+        """
         base_folder = Path("/mnt/sdceph/users/ibl/data/quarantine/tasks")
         path_short = self.one.eid2path(self.reference_session_eid).session_path_short()
         lab = self.one.get_details(self.reference_session_path)["lab"]
@@ -219,27 +337,59 @@ class ReprojectionTask(MesoscopeTask):
         return symlinked_reference_stack
 
     def load_histology(self) -> np.ndarray:
-        # returns the mlapdv volume
+        """Load the MLAPDV coordinates of the reference session's reference image.
+
+        Returns
+        -------
+        numpy.ndarray
+            Array with shape (h, w, 3) holding the (ml, ap, dv) coordinates in μm of each
+            pixel of the reference session's reference image.
+        """
         atlas = MRITorontoAtlas(res_um=25)
         local_histo_path = self._get_atlas_registered_reference_mlap()
         ccf_idx = np.load(local_histo_path)
 
+        # flip the ap axis to match the atlas volume orientation
         ccf_idx[:, :, 1] = np.abs(
             ccf_idx[:, :, 1].astype("int64") - atlas.label.shape[0]
         ).astype(ccf_idx.dtype)
-        # to be very explicit about: this is for the ref_img of the session that is aligned to the histo
+        # NB: these coordinates belong to the reference session, i.e. the one aligned to histology
         ref_img_histo_mlapdv = (
             atlas.ccf2xyz(ccf_idx * atlas.res_um, ccf_order="mlapdv") * 1e6
         )  # m -> μm
         return ref_img_histo_mlapdv
 
     def _load_brain_surface_points_from_metadata(self) -> dict:
-        # load the brain imaging points from the metadata file
-        # this is the function that should fail if they don't exist
+        """Read the brain surface points from the reference stack metadata.
+
+        Returns
+        -------
+        dict
+            Mapping with a 'points' key holding the brain surface points.
+
+        Raises
+        ------
+        KeyError
+            If the metadata does not contain any points.
+        """
         ref_img_meta = self.load_reference_stack_metadata()
         return {"points": ref_img_meta["points"]}
 
     def _load_brain_surface_points_from_file(self) -> dict:
+        """Read the brain surface points from the dedicated points file.
+
+        Returns
+        -------
+        dict
+            Contents of `referenceImage.points.json`.
+
+        Raises
+        ------
+        FileNotFoundError
+            If no points file exists.
+        ValueError
+            If more than one points file exists.
+        """
         ref_points_path = list(
             (self.session_path / self.raw_imaging_collection / "reference").glob(
                 "referenceImage.points.json"
@@ -255,13 +405,33 @@ class ReprojectionTask(MesoscopeTask):
         self,
         prefer: Literal["metadata", "file"] = "metadata",
     ) -> dict:
-        # attempts to load the brain surface points from the file
+        """Load the brain surface points, from either the points file or the stack metadata.
+
+        Both sources are tried. If they exist and disagree, `prefer` decides which one wins;
+        if only the non-preferred source exists, it is used and a warning is logged.
+
+        Parameters
+        ----------
+        prefer : {'metadata', 'file'}
+            Source to use when both exist and their contents differ.
+
+        Returns
+        -------
+        dict
+            The brain surface points.
+
+        Raises
+        ------
+        ValueError
+            If neither source provides points, or if `prefer` is not a valid source.
+        """
+        # from the points file
         try:
             brain_surface_points_file = self._load_brain_surface_points_from_file()
         except FileNotFoundError:
             brain_surface_points_file = None
 
-        # attempts to load the brain surface points from the metadata
+        # from the reference stack metadata
         try:
             brain_surface_points_meta = self._load_brain_surface_points_from_metadata()
         except KeyError:
@@ -291,13 +461,13 @@ class ReprojectionTask(MesoscopeTask):
         if brain_surface_points_file is None and brain_surface_points_meta is not None:
             if prefer == "file":
                 _logger.warning(
-                    "using metadata as a non-prefered source of brain surface points"
+                    "using metadata as a non-preferred source of brain surface points"
                 )
             return brain_surface_points_meta
         if brain_surface_points_file is not None and brain_surface_points_meta is None:
             if prefer == "metadata":
                 _logger.warning(
-                    "using points.json file as a non-prefered source of brain surface points"
+                    "using points.json file as a non-preferred source of brain surface points"
                 )
             return brain_surface_points_file
 
@@ -306,6 +476,9 @@ class ReprojectionTask(MesoscopeTask):
 
         This is the file created by the histology pipeline, one per subject.
         This file contains the Allen atlas image volume indices for each pixel of the reference stack.
+
+        On popeye the file is read in place from the histology folder. Elsewhere it is fetched
+        with a data handler, falling back to a direct Globus transfer and then to HTTP.
 
         Parameters
         ----------
@@ -319,8 +492,12 @@ class ReprojectionTask(MesoscopeTask):
             A uint16 array with shape (h, w, 3), comprising Allen atlas image volume indices for
             dimensions representing (ml, ap, dv).  The first two dimensions (h, w) should equal
             those of the reference stack.
-        """
 
+        Raises
+        ------
+        AssertionError
+            If the file could neither be transferred via Globus nor downloaded via HTTP.
+        """
         reference_collection = self.raw_imaging_collection + "/reference"
 
         if self.location == "popeye":
@@ -370,13 +547,12 @@ class ReprojectionTask(MesoscopeTask):
 
         if clobber or not local_file.exists():
             _logger.info("attempting to download histology file from flatiron")
-            # Download remote file
             assert self.one, "ONE required"
             local_file.parent.mkdir(parents=True, exist_ok=True)
             lab = self.one.get_details(self.reference_session_path)["lab"]
             remote_file = f"{lab}/{self.reference_session_path.session_path_short()}/{local_file.name}"
             try:
-                # assert isinstance(self.data_handler, dh.ServerGlobusDataHandler)  # If not, assume Globus not configured
+                # the histology folder is not part of the standard endpoints, so mount it as its own
                 handler = ServerGlobusDataHandler(
                     self.reference_session_path,
                     {"input_files": [], "output_files": []},
@@ -419,20 +595,42 @@ class ReprojectionTask(MesoscopeTask):
         self,
         ref_stack_path: str | Path,
         ref_sess_ref_stack_path: str | Path,
-        display: bool = False,  # TODO discuss what to do (where to store) the transform output
+        display: bool = False,
         save_plots: bool = False,
         save_transform: bool = False,
     ) -> ProjectiveTransform:
-        # TODO refactor
-        # naming is confusing: this is image registration and not dataset registration
+        """Find the image transform mapping this session's reference stack onto the reference session's.
 
-        # load the reference stack data from session and reference session
+        Note that this is *image* registration, not dataset registration to Alyx.
+
+        Parameters
+        ----------
+        ref_stack_path : str or pathlib.Path
+            Path of this session's reference stack, the stack that is being moved.
+        ref_sess_ref_stack_path : str or pathlib.Path
+            Path of the reference session's reference stack, the target of the registration.
+        display : bool
+            If True, build the registration delta animation and the keypoint plot.
+        save_plots : bool
+            If True, write those plots to the session's alf folder. Requires `display`.
+        save_transform : bool
+            If True, write the transform parameters and their quality metric to a json file
+            in the session's alf folder.
+
+        Returns
+        -------
+        skimage.transform.ProjectiveTransform
+            Transform mapping coordinates of this session's stack onto the reference session's.
+        """
+        # TODO refactor, and settle on where the transform output should be stored
+
+        # load the stacks of this session and of the reference session
         img_data = {}
         for key, path in zip(
             ["stack", "target_stack"],
             [ref_stack_path, ref_sess_ref_stack_path],
         ):
-            # key here: flipping dimensions
+            # swap Y and X to bring both stacks into the same convention
             img_data[key] = np.swapaxes(tifffile.imread(path), 1, 2)
             # img_data[key] = preprocess_vasculature(img_data[key]).astype("int16")
 
@@ -443,11 +641,11 @@ class ReprojectionTask(MesoscopeTask):
             transform_type="euclidean",
             return_details=True,
         )
-        # NOTE affine is overall actually worse, but better for single plane
+        # NB: 'affine' is worse overall, but better when registering a single plane
 
         img_data["aligned"] = apply_transform(img_data["stack"], ref_transform)
 
-        # evaluate transform
+        # score the transform by normalized cross-correlation, before and after
         ncc_before = evaluate(img_data["stack"], img_data["target_stack"])
         ncc_after = evaluate(img_data["aligned"], img_data["target_stack"])
 
@@ -459,16 +657,18 @@ class ReprojectionTask(MesoscopeTask):
             "method": "orb_robust",
         }
 
+        # plot the before/after delta of the registration
         if display:
-            # TODO find a different place and different namespace
+            # TODO find a different place and a different namespace for this plot
             save_path = (
                 self.session_path / "alf" / "_gr_reference_stack_registration.gif"
                 if save_plots
                 else None
             )
 
-            z = 8  # FIXME this is almost certainly dataset specific and needs to be inferred
-            # in some way, take peak brightness for example
+            # FIXME this plane is almost certainly dataset specific and should be inferred,
+            # for example from the plane of peak brightness
+            z = 8
             anim = inspect_registration_delta(
                 img_data["stack"],
                 img_data["target_stack"],
@@ -478,9 +678,9 @@ class ReprojectionTask(MesoscopeTask):
                 frames_per_second=1,  # 1s per frame in the saved gif
             )
 
-        # plot keypoints vis
+        # plot the keypoint matches that the transform was fit on
         if display:
-            # TODO find a different place and different namespace
+            # TODO find a different place and a different namespace for this plot
             save_path = (
                 self.session_path / "alf" / "_gr_registration_keypoints.png"
                 if save_plots
@@ -497,8 +697,9 @@ class ReprojectionTask(MesoscopeTask):
         # save transform to json
         if save_transform:
             params = params.copy()
-            # TODO find a better namespace, and place for this dataset
+            # TODO find a better namespace and place for this dataset
             save_path = self.session_path / "alf" / "_gr_registration_keypoints.json"
+            # cast numpy types to their python equivalents for json serialization
             for k, v in params.items():
                 if isinstance(v, np.ndarray):
                     params[k] = v.tolist()
@@ -510,23 +711,29 @@ class ReprojectionTask(MesoscopeTask):
             with open(save_path, "w") as fp:
                 json.dump(params, fp, indent=4)
 
-        return ref_transform  # output signature might change
+        return ref_transform  # the output signature might still change
 
     def _run(self):
+        """Run the task and return the paths of the registered output datasets.
+
+        Not implemented yet.
+        """
         return None
 
     def verify_data_presence(self):
-        # has reference image?
+        """Check that all inputs the task needs can be loaded.
+
+        Each loader raises if its input is missing, so a silent return means the session is
+        ready to be processed.
+        """
+        # this session has a reference stack
         self.load_reference_stack()
 
-        # reference image reference stack
-        self.load_reference_session_reference_stack()
-
-        # has brain surface?
+        # this session has brain surface points
         self.load_brain_surface_points()
 
-        # reference session has reference stack?
+        # the reference session has a reference stack
         self.load_reference_session_reference_stack()
 
-        # reference session has histology?
+        # the reference session has histology
         self.load_histology()
