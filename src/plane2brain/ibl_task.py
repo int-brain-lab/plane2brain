@@ -79,15 +79,19 @@ class ReprojectionTask(MesoscopeTask):
 
         signature = {
             "input_files": [
+                I("_ibl_rawImagingData.meta.json", self.raw_imaging_collection, True),
                 I(
-                    "_ibl_rawImagingData.meta.json",
-                    self.raw_imaging_collection,
+                    "referenceImage.stack.tif",
+                    f"{self.raw_imaging_collection}/reference",
                     True,
-                    unique=False,
+                ),
+                I(
+                    "referenceImage.meta.json",
+                    f"{self.raw_imaging_collection}/reference",
+                    True,
                 ),
             ],
             "output_files": [
-                O("referenceImage.mlapdv.npy", "alf/FOV*", True),
                 O("referenceImage.mlapdv.npy", "alf/FOV*", True),
             ],  # TODO ask about ExpectedDataset.output (or rather the lack of them)
         }
@@ -145,15 +149,17 @@ class ReprojectionTask(MesoscopeTask):
         return self._get_ref_stack_path(self.session_path, self.raw_imaging_collection)
 
     def get_reference_session_reference_stack_path(self) -> Path:
-        """Return the path to the reference stack of the reference session."""
-        # NOTE this should fail loudly when it fails. All the checks whether
-        # the reference stack has the correct shape (or exists at all) should
-        # not live here
-        # All loaders behave as if "happy path"
-        return self._get_ref_stack_path(
-            self.reference_session_path,
-            self.reference_session_raw_imaging_collection,
-        )
+        """Return the path to the reference stack of the reference session.
+        this also deals with the fact that datasets need to be sym linked
+        to the quarantine folder on popeye"""
+
+        if self.location == "popeye":
+            return self._symlink_reference_stack()
+        else:
+            return self._get_ref_stack_path(
+                self.reference_session_path,
+                self.reference_session_raw_imaging_collection,
+            )
 
     def _get_ref_stack_path(
         self, session_path: Path, raw_imaging_collection: str
@@ -174,6 +180,43 @@ class ReprojectionTask(MesoscopeTask):
     def load_reference_session_reference_stack(self) -> np.ndarray:
         # load the reference stack of the reference session
         return tifffile.imread(self.get_reference_session_reference_stack_path())
+
+    def _symlink_reference_stack(self) -> None:
+        """creates the symlink necessary for running the task on popeye and returns the
+        link path."""
+        base_folder = Path("/mnt/sdceph/users/ibl/data/quarantine/tasks")
+        path_short = self.one.eid2path(self.reference_session_eid).session_path_short()
+        lab = self.one.get_details(self.reference_session_path)["lab"]
+        symlinked_reference_stack = (
+            base_folder
+            / type(self).__name__
+            / lab
+            / "Subjects"
+            / path_short
+            / self.raw_imaging_collection
+            / "reference"
+            / "referenceImage.stack.tif"
+        )
+
+        _session_folder = (
+            Path("/mnt/sdceph/users/ibl/data")
+            / lab
+            / "Subjects"
+            / path_short
+            / self.raw_imaging_collection
+            / "reference"
+        )
+
+        reference_stack_path = list(_session_folder.glob("*referenceImage.stack.*.tif"))
+        assert len(reference_stack_path) == 1, (
+            "none or multiple referenceImage stacks found during symlinking"
+        )
+
+        if symlinked_reference_stack.exists():
+            symlinked_reference_stack.unlink()
+        symlinked_reference_stack.parent.mkdir(parents=True, exist_ok=True)
+        symlinked_reference_stack.symlink_to(reference_stack_path[0])
+        return symlinked_reference_stack
 
     def load_histology(self) -> np.ndarray:
         # returns the mlapdv volume
@@ -282,12 +325,10 @@ class ReprojectionTask(MesoscopeTask):
 
         if self.location == "popeye":
             lab = self.one.get_details(self.reference_session_path)["lab"]
-            base_folder = Path(f"/mnt/sdceph/users/ibl/data/{lab}")
+            base_folder = Path(f"/mnt/sdceph/users/ibl/data/histology/{lab}")
             local_file = (
                 base_folder
                 / self.reference_session_path.session_path_short()
-                / self.raw_imaging_collection
-                / "reference"
                 / "referenceImage.mlapdv.npy"
             )
             return local_file
