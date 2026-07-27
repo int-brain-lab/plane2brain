@@ -19,8 +19,8 @@ from plane2brain.coordinate_systems import (
 # %% whiterussian / local server base folder
 # BASE_FOLDER: Path = Path("/mnt/s0/Data/Subjects")
 COORDS: Literal["rois", "px"] = "px"
-LOCATION: Literal["server", "local", "popeye"] = "popeye"
-SAVE_OUTPUT: bool = True
+LOCATION: Literal["server", "local", "popeye"] = "server"
+SAVE_OUTPUT: bool = False
 PLOT: bool = False
 DEBUG: bool = True
 ATLAS_RES: int = 25

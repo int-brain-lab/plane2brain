@@ -1,14 +1,17 @@
+from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Literal
 from uuid import UUID
-
+from one.api import ONE
+from one.alf.path import ALFPath
 import numpy as np
 import tifffile
 from iblatlas.atlas import MRITorontoAtlas
+from ibllib.oneibl import data_handlers
 from ibllib.oneibl.data_handlers import ExpectedDataset, ServerGlobusDataHandler
 from mpci.alyx.tasks import MesoscopeTask
-from registration import (
+from plane2brain.registration import (
     apply_transform,
     evaluate,
     inspect_registration_delta,
@@ -37,8 +40,9 @@ class ReprojectionTask(MesoscopeTask):
     def __init__(
         self,
         *args,
-        FOV: str,
-        reference_session_eid: str | UUID,
+        FOV: str | None = None,
+        reference_session_path: str | Path,
+        one: ONE | None = None,
         raw_imaging_collection: str | None = None,
         reference_session_raw_imaging_collection: str | None = None,
         **kwargs,
@@ -48,20 +52,17 @@ class ReprojectionTask(MesoscopeTask):
         Infers raw imaging collections for both the current and reference
         session if not given explicitly.
         """
-        # TODO
-        # session and an eid of the reference session
-        # the raw imaging collection
-        # the raw imaging collection of the reference session
+        self.one = one or ONE()
+        assert not self.one.offline
+        session_path = args[0]
+        self.eid = self.one.eid2path(session_path)
+
         self.FOV = FOV
-        self.reference_session_eid = self.validate_reference_session(
-            reference_session_eid
-        )
         self.raw_imaging_collection = (
-            raw_imaging_collection
-            or self.infer_raw_imaging_collection(self.session_path)
+            raw_imaging_collection or self.infer_raw_imaging_collection(session_path)
         )
-        self.reference_session_eid = reference_session_eid
-        self.reference_session_path = self.one.eid2path(reference_session_eid)
+        self.reference_session_path = ALFPath(reference_session_path)
+        self.reference_session_eid = one.path2eid(self.reference_session_path)
         self.reference_session_raw_imaging_collection = (
             reference_session_raw_imaging_collection
             or self.infer_raw_imaging_collection(self.reference_session_path)
@@ -98,7 +99,7 @@ class ReprojectionTask(MesoscopeTask):
             self.one.eid2ref(reference_session_eid)["subject"]
             == self.one.eid2ref(self.eid)["subject"]
         ), "reference session does not match to this session: wrong subject"
-        return UUID(reference_session_eid)
+        return reference_session_eid
 
     @staticmethod
     def infer_raw_imaging_collection(session_path: str | Path) -> str:
@@ -169,11 +170,11 @@ class ReprojectionTask(MesoscopeTask):
 
     def load_reference_stack(self) -> np.ndarray:
         # load the reference stack
-        return tifffile.imread(self.get_reference_stack_path)
+        return tifffile.imread(self.get_reference_stack_path())
 
     def load_reference_session_reference_stack(self) -> np.ndarray:
         # load the reference stack of the reference session
-        return tifffile.imread(self.get_reference_session_reference_stack_path)
+        return tifffile.imread(self.get_reference_session_reference_stack_path())
 
     def load_histology(self) -> np.ndarray:
         # returns the mlapdv volume
@@ -202,7 +203,10 @@ class ReprojectionTask(MesoscopeTask):
                 "referenceImage.points.*.json"
             )
         )
-        assert len(ref_points_path) == 1, "multiple reference point files found"
+        if len(ref_points_path) == 0:
+            raise FileNotFoundError
+        if len(ref_points_path) > 1:
+            raise ValueError("multiple reference point files found")
         return json.loads(Path(ref_points_path[0]).read_text(encoding="utf-8"))
 
     def load_brain_surface_points(
@@ -258,9 +262,6 @@ class ReprojectionTask(MesoscopeTask):
             return brain_surface_points_file
 
     def _get_atlas_registered_reference_mlap(self, clobber=False):
-        # TODO this was copied over from Miles code, make sure this is popeye compatible
-        # TODO deal with the entire reference_session issue
-
         """Download the aligned reference stack Allen atlas indices.
 
         This is the file created by the histology pipeline, one per subject.
@@ -289,15 +290,17 @@ class ReprojectionTask(MesoscopeTask):
         # assert all(
         #     x.identifiers[-1].startswith("reference") for x in signature["input_files"]
         # )
-        reference_collection = self.raw_imaging_collection / "reference"
+        reference_collection = self.raw_imaging_collection + "/reference"
         signature = {
-            "input_files": ExpectedDataset.input(
-                "referenceImage.mlapdv.npy", reference_collection, True
-            ),
+            "input_files": [
+                ExpectedDataset.input(
+                    "referenceImage.mlapdv.npy", reference_collection, True
+                )
+            ],
             "output_files": [],
         }
         if self.location == "server" and self.force:
-            handler = ServerGlobusDataHandler(
+            handler = data_handlers.ServerGlobusDataHandler(
                 self.reference_session_path, signature, one=self.one
             )
         else:
@@ -467,6 +470,9 @@ class ReprojectionTask(MesoscopeTask):
 
         return ref_transform  # output signature might change
 
+    def _run(self):
+        return None
+
     def pipeline(self):
         # the first draft of the conditional pipeline
 
@@ -474,7 +480,7 @@ class ReprojectionTask(MesoscopeTask):
         self.load_reference_stack()
 
         # has brain surface? yes / no
-        self.load_brain_surface_points()
+        # self.load_brain_surface_points()
 
         # reference session has reference stack?
         self.load_reference_session_reference_stack()
