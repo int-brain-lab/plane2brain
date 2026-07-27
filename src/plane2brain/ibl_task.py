@@ -91,7 +91,7 @@ class ReprojectionTask(MesoscopeTask):
             or self.infer_raw_imaging_collection(self.reference_session_path)
         )
 
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, one=self.one, **kwargs)
 
     @property
     def signature(self):
@@ -114,9 +114,7 @@ class ReprojectionTask(MesoscopeTask):
                     True,
                 ),
             ],
-            "output_files": [
-                O("referenceImage.mlapdv.npy", "alf/FOV*", True),
-            ],  # TODO ask about ExpectedDataset.output (or rather the lack of them)
+            "output_files": [],  # TODO ask about ExpectedDataset.output (or rather the lack of them)
         }
 
         return signature
@@ -232,7 +230,7 @@ class ReprojectionTask(MesoscopeTask):
             Path of the `referenceImage.stack` tif, or of its symlink when on popeye.
         """
         if self.location == "popeye":
-            return self._symlink_reference_stack()
+            return self._symlink_reference_session_reference_stack()
         else:
             return self._get_ref_stack_path(
                 self.reference_session_path,
@@ -289,7 +287,7 @@ class ReprojectionTask(MesoscopeTask):
         """
         return tifffile.imread(self.get_reference_session_reference_stack_path())
 
-    def _symlink_reference_stack(self) -> None:
+    def _symlink_reference_session_reference_stack(self) -> None:
         """Symlink the reference session's reference stack into the popeye quarantine folder.
 
         Returns
@@ -311,7 +309,7 @@ class ReprojectionTask(MesoscopeTask):
             / lab
             / "Subjects"
             / path_short
-            / self.raw_imaging_collection
+            / self.reference_session_raw_imaging_collection
             / "reference"
             / "referenceImage.stack.tif"
         )
@@ -321,7 +319,7 @@ class ReprojectionTask(MesoscopeTask):
             / lab
             / "Subjects"
             / path_short
-            / self.raw_imaging_collection
+            / self.reference_session_raw_imaging_collection
             / "reference"
         )
 
@@ -498,7 +496,9 @@ class ReprojectionTask(MesoscopeTask):
         AssertionError
             If the file could neither be transferred via Globus nor downloaded via HTTP.
         """
-        reference_collection = self.raw_imaging_collection + "/reference"
+        reference_collection = (
+            self.reference_session_raw_imaging_collection + "/reference"
+        )
 
         if self.location == "popeye":
             lab = self.one.get_details(self.reference_session_path)["lab"]
@@ -531,13 +531,13 @@ class ReprojectionTask(MesoscopeTask):
         _logger.info(
             "Looking for reference MLAPDV in %s",
             self.reference_session_path.joinpath(
-                self.raw_imaging_collection, "reference"
+                self.reference_session_raw_imaging_collection, "reference"
             ),
         )
         # NB: The local reference folder is expected to exist after handler.setUp()
         local_file = (
             self.reference_session_path
-            / self.raw_imaging_collection
+            / self.reference_session_raw_imaging_collection
             / "reference"
             / "referenceImage.mlapdv.npy"
         )
