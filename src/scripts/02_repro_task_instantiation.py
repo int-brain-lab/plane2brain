@@ -3,14 +3,33 @@ from one.api import ONE
 from plane2brain.ibl_task import ReprojectionTask
 from pathlib import Path
 
-one = ONE()
-session_path = Path("/mnt/s0/Data/Subjects/SP058/2024-08-01/001")
-reference_session_path = Path("/mnt/s0/Data/Subjects/SP058/2024-08-14/001")
+LOCATION = "popeye"
+BASE_FOLDER_LOCAL_SERVER = Path("/mnt/s0/Data/Subjects")
+
+session_path = "SP058/2024-08-01/001"
+reference_session_path = "SP058/2024-08-14/001"
+
+# %%
+match LOCATION:
+    case "popeye":
+        from deploy.iblsdsc import OneSdsc
+
+        # requires the unmerged PR #121 https://github.com/int-brain-lab/iblscripts/pull/121
+        one = OneSdsc(location="popeye")
+        session_path = one.eid2path(one.path2eid(session_path))
+        reference_session_path = one.eid2path(one.path2eid(reference_session_path))
+    case "server":
+        one = ONE()
+        session_path = BASE_FOLDER_LOCAL_SERVER / session_path
+        reference_session_path = BASE_FOLDER_LOCAL_SERVER / reference_session_path
+
+
 repro_task = ReprojectionTask(
     session_path,
     reference_session_path=reference_session_path,
     FOV="FOV_00",
     one=one,
+    location=LOCATION,
 )
 
 repro_task.setUp()

@@ -134,9 +134,8 @@ class ReprojectionTask(MesoscopeTask):
         reference_collection = (
             self.session_path / self.raw_imaging_collection / "reference"
         )
-        filepath = [
-            p for p in reference_collection.glob("*") if "referenceImage.meta" in str(p)
-        ]
+        filepath = list(reference_collection.glob("*referenceImage.meta*"))
+
         assert len(filepath) == 1
         return json.loads(Path(filepath[0]).read_text(encoding="utf-8"))
 
@@ -161,7 +160,7 @@ class ReprojectionTask(MesoscopeTask):
     ) -> Path:
         """Find the reference stack file within a session's raw imaging collection."""
         path = session_path / raw_imaging_collection / "reference"
-        filepath = [p for p in path.glob("*") if "referenceImage.stack" in str(p)]
+        filepath = list(path.glob("*referenceImage.stack*"))
 
         assert len(filepath) == 1, (
             f"number of reference stacks is: {len(filepath)} - and has to be exactly 1"
@@ -200,7 +199,7 @@ class ReprojectionTask(MesoscopeTask):
     def _load_brain_surface_points_from_file(self) -> dict:
         ref_points_path = list(
             (self.session_path / self.raw_imaging_collection / "reference").glob(
-                "referenceImage.points.*.json"
+                "referenceImage.points.json"
             )
         )
         if len(ref_points_path) == 0:
@@ -475,7 +474,7 @@ class ReprojectionTask(MesoscopeTask):
     def _run(self):
         return None
 
-    def verify_data_presenece(self):
+    def verify_data_presence(self):
         # has reference image?
         self.load_reference_stack()
 
