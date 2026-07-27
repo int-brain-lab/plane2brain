@@ -279,16 +279,20 @@ class ReprojectionTask(MesoscopeTask):
             those of the reference stack.
         """
 
-        # Ensure reference session reference files present
-        # this is order sensitive
-        # signature = {
-        #     "input_files": self.signature["input_files"][-3:],
-        #     "output_files": [],
-        # }
-        # assert all(
-        #     x.identifiers[-1].startswith("reference") for x in signature["input_files"]
-        # )
         reference_collection = self.raw_imaging_collection + "/reference"
+
+        if self.location == "popeye":
+            lab = self.one.get_details(self.reference_session_path)["lab"]
+            base_folder = Path(f"/mnt/sdceph/users/ibl/data/{lab}")
+            local_file = (
+                base_folder
+                / self.reference_session_path.session_path_short()
+                / self.raw_imaging_collection
+                / "reference"
+                / "referenceImage.mlapdv.npy"
+            )
+            return local_file
+
         signature = {
             "input_files": [
                 ExpectedDataset.input(
