@@ -14,5 +14,5 @@ repro_task = ReprojectionTask(
 )
 
 repro_task.setUp()
-repro_task.pipeline()
+repro_task.verify_data_presence()
 # %%

@@ -213,15 +213,13 @@ class ReprojectionTask(MesoscopeTask):
         self,
         prefer: Literal["metadata", "file"] = "metadata",
     ) -> dict:
-        # the brain surface points are now stored in the metadata and not in the points.json
-
-        # returns None if can't load any form of brain surface points!
+        # attempts to load the brain surface points from the file
         try:
             brain_surface_points_file = self._load_brain_surface_points_from_file()
         except FileNotFoundError:
             brain_surface_points_file = None
 
-        # otherwise just return from the metadata
+        # attempts to load the brain surface points from the metadata
         try:
             brain_surface_points_meta = self._load_brain_surface_points_from_metadata()
         except KeyError:
@@ -473,14 +471,15 @@ class ReprojectionTask(MesoscopeTask):
     def _run(self):
         return None
 
-    def pipeline(self):
-        # the first draft of the conditional pipeline
-
-        # has reference image? yes / no
+    def verify_data_presenece(self):
+        # has reference image?
         self.load_reference_stack()
 
-        # has brain surface? yes / no
-        # self.load_brain_surface_points()
+        # reference image reference stack
+        self.load_reference_session_reference_stack()
+
+        # has brain surface?
+        self.load_brain_surface_points()
 
         # reference session has reference stack?
         self.load_reference_session_reference_stack()
