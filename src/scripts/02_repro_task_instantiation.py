@@ -3,10 +3,10 @@ from one.api import ONE
 from plane2brain.ibl_task import ReprojectionTask
 from pathlib import Path
 
-LOCATION = "popeye"
+LOCATION = "server"
 BASE_FOLDER_LOCAL_SERVER = Path("/mnt/s0/Data/Subjects")
 
-session_path = "SP058/2024-08-01/001"
+session_path = "SP058/2024-07-24/001"
 reference_session_path = "SP058/2024-08-14/001"
 
 # %%
@@ -27,11 +27,18 @@ match LOCATION:
 repro_task = ReprojectionTask(
     session_path,
     reference_session_path=reference_session_path,
-    FOV="FOV_00",
     one=one,
     location=LOCATION,
 )
 
 repro_task.setUp()
 repro_task.verify_data_presence()
+repro_task.pipeline()
 # %%
+import matplotlib.pyplot as plt
+
+fig, axes = plt.subplots()
+ds = 1
+for uuid, _coords in repro_task.coords.items():
+    points = _coords["mlapdv"]
+    axes.plot(points[::ds, 0], points[::ds, 1], ".")

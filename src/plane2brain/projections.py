@@ -184,9 +184,7 @@ def get_brain_surface_normal(
     # and scanimage specific
 
     # DOCME user selected
-    stack_ixs = [
-        point["stack_idx"] for point in reference_brain_surface_points["points"]
-    ]
+    stack_ixs = [point["stack_idx"] for point in reference_brain_surface_points]
 
     # the position of the voice coil (for z offset calculation)
     # is the same for all stack planes, check here:
@@ -205,7 +203,7 @@ def get_brain_surface_normal(
     # to um. CAREFUL here - they are stored with the swapped dimensions
     # this should be encapsulated in an ibl specific reader
     brain_surface_points_rel = np.array(
-        [point["coords"][::-1] for point in reference_brain_surface_points["points"]]
+        [point["coords"][::-1] for point in reference_brain_surface_points]
     )
     brain_surface_points_rel_um = coordinate_systems_ref.transform(
         brain_surface_points_rel,

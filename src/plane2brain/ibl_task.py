@@ -445,7 +445,8 @@ class ReprojectionTask(MesoscopeTask):
             grid,
             method="linear",
             bounds_error=False,
-            fill_value=np.nan,
+            # fill_value=np.nan,
+            fill_value=None,  # this should lead to extrapolation
         )
         return interpolator
 
@@ -1039,7 +1040,9 @@ class ReprojectionTask(MesoscopeTask):
                 raise NotImplementedError
 
             # find point on surface
-            coords[uuid]["mlapdv_on_surface"] = atlas.get_dv_for_mlap(mlap_interp)
+            coords[uuid]["mlapdv_on_surface"] = atlas.get_dv_for_mlap(
+                mlap_interp  # + 1e-6
+            )  # TODO trace back what those were for
 
             # project down into the brain; skipped entirely if no brain surface points are
             # available, since depth below the surface is undefined without them
@@ -1056,3 +1059,4 @@ class ReprojectionTask(MesoscopeTask):
                         coords_depths=depths,
                     )
                 )
+        self.coords = coords

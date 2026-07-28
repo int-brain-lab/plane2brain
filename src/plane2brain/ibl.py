@@ -32,7 +32,9 @@ def get_fov_map(
     # if session path is given, check if metadata and extracted data
     # contain the same FOVs
     if session_path:
-        assert sorted(fov_names) == sorted((session_path / "alf").glob("FOV_*"))
+        assert sorted(fov_names) == sorted(
+            path.name for path in (session_path / "alf").glob("FOV_*")
+        )
 
     fov_uuids = [meta["roiUUID"] for meta in raw_imaging_meta["FOV"]]
     # fov_metas = [[meta for meta in scanimage_fov_metas if meta["roiUuid"] == uuid][0] for uuid in fov_uuids]
