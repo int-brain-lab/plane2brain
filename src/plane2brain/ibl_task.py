@@ -1,16 +1,20 @@
 from __future__ import annotations
+
 import json
 from pathlib import Path
 from typing import Literal
 from uuid import UUID
-from one.api import ONE
-from one.alf.path import ALFPath
+
 import numpy as np
 import tifffile
 from iblatlas.atlas import MRITorontoAtlas
 from ibllib.oneibl import data_handlers
 from ibllib.oneibl.data_handlers import ExpectedDataset, ServerGlobusDataHandler
 from mpci.alyx.tasks import MesoscopeTask
+from one.alf.path import ALFPath
+from one.api import ONE
+from skimage.transform import ProjectiveTransform
+
 from plane2brain.registration import (
     apply_transform,
     evaluate,
@@ -18,7 +22,6 @@ from plane2brain.registration import (
     plot_keypoints,
     register_stacks,
 )
-from skimage.transform import ProjectiveTransform
 
 IBL_MESOSCOPE_DEFINITIONS = {
     "scanner_orientation": {"rotation": 0.0, "invert_axis": [True, True, False]},
@@ -78,19 +81,21 @@ class ReprojectionTask(MesoscopeTask):
         self.one = one or ONE()
         assert not self.one.offline
         session_path = args[0]
-        self.eid = self.one.eid2path(session_path)
+        self.eid = self.one.path2eid(session_path)
 
         self.FOV = FOV
         self.raw_imaging_collection = (
             raw_imaging_collection or self.infer_raw_imaging_collection(session_path)
         )
         self.reference_session_path = ALFPath(reference_session_path)
-        self.reference_session_eid = one.path2eid(self.reference_session_path)
+        self.reference_session_eid = self.one.path2eid(self.reference_session_path)
         self.reference_session_raw_imaging_collection = (
             reference_session_raw_imaging_collection
             or self.infer_raw_imaging_collection(self.reference_session_path)
         )
 
+        # keeping a list of links for teardown
+        self.links = []
         super().__init__(*args, one=self.one, **kwargs)
 
     @property
@@ -158,6 +163,7 @@ class ReprojectionTask(MesoscopeTask):
             Name of the raw imaging collection, e.g. 'raw_imaging_data_00'. If several
             collections hold a reference folder, the last one is returned.
         """
+        session_path = Path(session_path)
         assert session_path.exists()
         collections = [
             c
@@ -332,6 +338,9 @@ class ReprojectionTask(MesoscopeTask):
             symlinked_reference_stack.unlink()
         symlinked_reference_stack.parent.mkdir(parents=True, exist_ok=True)
         symlinked_reference_stack.symlink_to(reference_stack_path[0])
+
+        # keep links for teardown
+        self.links.append(symlinked_reference_stack)
         return symlinked_reference_stack
 
     def load_histology(self) -> np.ndarray:
@@ -371,7 +380,7 @@ class ReprojectionTask(MesoscopeTask):
             If the metadata does not contain any points.
         """
         ref_img_meta = self.load_reference_stack_metadata()
-        return {"points": ref_img_meta["points"]}
+        return ref_img_meta["points"]
 
     def _load_brain_surface_points_from_file(self) -> dict:
         """Read the brain surface points from the dedicated points file.
@@ -397,7 +406,9 @@ class ReprojectionTask(MesoscopeTask):
             raise FileNotFoundError
         if len(ref_points_path) > 1:
             raise ValueError("multiple reference point files found")
-        return json.loads(Path(ref_points_path[0]).read_text(encoding="utf-8"))
+        return json.loads(Path(ref_points_path[0]).read_text(encoding="utf-8"))[
+            "points"
+        ]
 
     def load_brain_surface_points(
         self,
@@ -718,7 +729,7 @@ class ReprojectionTask(MesoscopeTask):
 
         Not implemented yet.
         """
-        return None
+        return
 
     def verify_data_presence(self):
         """Check that all inputs the task needs can be loaded.
@@ -737,3 +748,8 @@ class ReprojectionTask(MesoscopeTask):
 
         # the reference session has histology
         self.load_histology()
+
+    def tearDown(self):
+        for link in self.links:
+            link.unlink()
+        super().tearDown()
