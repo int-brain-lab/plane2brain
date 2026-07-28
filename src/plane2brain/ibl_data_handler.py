@@ -46,7 +46,7 @@ def init_data_handler(
     dh.setUp()  # download missing data
     dh.assert_expected_inputs(raise_error=True)  # Ensure everything present
     file_paths = [session_path / dataset for dataset in datasets]
-    if not all([file_path.exists() for file_path in file_paths]):
+    if not all(file_path.exists() for file_path in file_paths):
         for file in file_paths:
             if not file.exists():
                 print(f"missing file: {file}")
@@ -57,7 +57,7 @@ def init_data_handler(
 # raw imaging metadata for the and the FOVs
 # %%
 one = ONE()
-eid = one.ref2eid(dict(subject="SP058", date="2024-08-14", sequence="001"))
+eid = one.ref2eid({"subject": "SP058", "date": "2024-08-14", "sequence": "001"})
 dataset = ALFPath("raw_imaging_data_01/_ibl_rawImagingData.meta.json")
 location = "local"
 init_data_handler(eid, [dataset], "local", one=one)

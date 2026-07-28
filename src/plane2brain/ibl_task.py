@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from itertools import product
 from pathlib import Path
 from typing import Literal
 from uuid import UUID
@@ -15,6 +16,9 @@ from one.alf.path import ALFPath
 from one.api import ONE
 from skimage.transform import ProjectiveTransform
 
+from plane2brain import ibl, projections, scanimage
+from plane2brain.atlas import ProjectionAtlas
+from plane2brain.coordinate_systems import create_coordinate_system_for_image
 from plane2brain.registration import (
     apply_transform,
     evaluate,
@@ -27,9 +31,33 @@ IBL_MESOSCOPE_DEFINITIONS = {
     "scanner_orientation": {"rotation": 0.0, "invert_axis": [True, True, False]},
     "scanimage_dimensions": ("Y", "X"),
 }
+# ScanImage metadata stores dimensions in XY order by default, where X is the
+# resonant (fast-scan) axis; in our reference image that axis is the second one.
+
 import logging
 
 _logger = logging.getLogger(__name__)
+ATLAS_RES = 25
+
+from ibllib.oneibl.data_handlers import PopeyeDataHandler
+from ibllib.oneibl.patcher import S3Patcher
+
+
+class PopeyeS3DataHandler(PopeyeDataHandler):
+    # don't look. There is nothing to see here.
+    def uploadData(self, outputs, version, **kwargs):
+        if isinstance(outputs, list):
+            versions = [version for _ in outputs]
+        else:
+            versions = [version]
+        s3_patcher = S3Patcher(one=self.one)
+        return s3_patcher.patch_dataset(
+            outputs, created_by=self.one.alyx.user, versions=versions, **kwargs
+        )
+
+
+from scipy.interpolate import RegularGridInterpolator
+from scipy.ndimage import gaussian_filter
 
 
 class ReprojectionTask(MesoscopeTask):
@@ -52,21 +80,19 @@ class ReprojectionTask(MesoscopeTask):
     def __init__(
         self,
         *args,
-        FOV: str | None = None,
         reference_session_path: str | Path,
         one: ONE | None = None,
         raw_imaging_collection: str | None = None,
         reference_session_raw_imaging_collection: str | None = None,
+        interpolation_sigma=25,
         **kwargs,
     ):
-        """Initialize the task with FOV and reference session identifiers.
+        """Initialize the task with this session's and the reference session's identifiers.
 
         Parameters
         ----------
         *args : tuple
             Positional arguments forwarded to `MesoscopeTask`; the first is the session path.
-        FOV : str, optional
-            Name of the field of view to process. If None, all FOVs are considered.
         reference_session_path : str or pathlib.Path
             Session path of the histology-aligned reference session of the same subject.
         one : one.api.ONE, optional
@@ -75,17 +101,26 @@ class ReprojectionTask(MesoscopeTask):
             Raw imaging collection of this session. Inferred if not given.
         reference_session_raw_imaging_collection : str, optional
             Raw imaging collection of the reference session. Inferred if not given.
+        interpolation_sigma : int, optional
+            Standard deviation, in pixels, of the Gaussian filter applied to the reference
+            session's histology grid before interpolation. Default is 25.
         **kwargs : dict
             Keyword arguments forwarded to `MesoscopeTask`.
         """
-        self.one = one or ONE()
-        assert not self.one.offline
-        session_path = args[0]
-        self.eid = self.one.path2eid(session_path)
 
-        self.FOV = FOV
+        # on popeye the outputs are patched to S3, so the handler has to be picked before the
+        # parent constructor resolves one from the location
+        if kwargs.get("location") == "popeye":
+            kwargs.setdefault("data_handler_class", PopeyeS3DataHandler)
+        super().__init__(*args, one=one or ONE(), **kwargs)
+
+        if self.one.offline:
+            raise ValueError("ReprojectionTask requires an online ONE instance")
+
+        self.eid = self.one.path2eid(self.session_path)
         self.raw_imaging_collection = (
-            raw_imaging_collection or self.infer_raw_imaging_collection(session_path)
+            raw_imaging_collection
+            or self.infer_raw_imaging_collection(self.session_path)
         )
         self.reference_session_path = ALFPath(reference_session_path)
         self.reference_session_eid = self.one.path2eid(self.reference_session_path)
@@ -94,16 +129,22 @@ class ReprojectionTask(MesoscopeTask):
             or self.infer_raw_imaging_collection(self.reference_session_path)
         )
 
-        # keeping a list of links for teardown
-        self.links = []
-        super().__init__(*args, one=self.one, **kwargs)
+        # keep references to links for unlinking during tearDown
+        self.links: list[Path] = []
+
+        self.interpolation_sigma = interpolation_sigma
+
+    def tearDown(self):
+        """Unlink any symlinks created during the task, then run the default teardown."""
+        for link in self.links:
+            link.unlink()
+        super().tearDown()
 
     @property
     def signature(self):
         """Build the task's expected input and output dataset signature."""
         I = ExpectedDataset.input
         O = ExpectedDataset.output
-        # how does this fan out accross FOVs?
 
         signature = {
             "input_files": [
@@ -177,7 +218,7 @@ class ReprojectionTask(MesoscopeTask):
 
         return collections[-1].parts[-1]
 
-    def load_imaging_metadata(self) -> dict:
+    def load_raw_imaging_metadata(self) -> dict:
         """Load the raw imaging metadata of this session.
 
         Returns
@@ -366,6 +407,48 @@ class ReprojectionTask(MesoscopeTask):
         )  # m -> μm
         return ref_img_histo_mlapdv
 
+    @staticmethod
+    def interpolate_histology(
+        histo_mlapdv: np.ndarray,
+        sigma: int | None = None,
+    ) -> RegularGridInterpolator:
+        """Build a linear interpolator for the ML/AP histology coordinates over pixel space.
+
+        Only the ML and AP channels are interpolated; DV is dropped, since depth below the
+        brain surface is derived separately (from the reference stack and atlas surface).
+
+        Parameters
+        ----------
+        histo_mlapdv : numpy.ndarray
+            Array with shape (h, w, 3) holding the (ml, ap, dv) coordinates in μm of each
+            pixel of the reference session's reference image, as returned by `load_histology`.
+        sigma : int, optional
+            Standard deviation, in pixels, of the Gaussian filter applied to the ML/AP grid
+            before building the interpolator. If None, no smoothing is applied.
+
+        Returns
+        -------
+        scipy.interpolate.RegularGridInterpolator
+            Interpolator mapping a (row, column) pixel position to its (ml, ap) coordinate.
+            Returns NaN for positions outside the grid.
+        """
+        grid = histo_mlapdv[:, :, :-1]
+
+        xs = np.arange(grid.shape[0])
+        ys = np.arange(grid.shape[1])
+
+        if sigma is not None:
+            grid = gaussian_filter(grid.astype(float), sigma=(sigma, sigma, 0))
+
+        interpolator = RegularGridInterpolator(
+            (xs, ys),
+            grid,
+            method="linear",
+            bounds_error=False,
+            fill_value=np.nan,
+        )
+        return interpolator
+
     def _load_brain_surface_points_from_metadata(self) -> dict:
         """Read the brain surface points from the reference stack metadata.
 
@@ -483,8 +566,10 @@ class ReprojectionTask(MesoscopeTask):
     def _get_atlas_registered_reference_mlap(self, clobber=False):
         """Download the aligned reference stack Allen atlas indices.
 
-        This is the file created by the histology pipeline, one per subject.
-        This file contains the Allen atlas image volume indices for each pixel of the reference stack.
+        This is the file created by the histology pipeline, one per subject. It contains a
+        uint16 array with shape (h, w, 3), comprising Allen atlas image volume indices for
+        dimensions representing (ml, ap, dv). The first two dimensions (h, w) should equal
+        those of the reference stack.
 
         On popeye the file is read in place from the histology folder. Elsewhere it is fetched
         with a data handler, falling back to a direct Globus transfer and then to HTTP.
@@ -492,15 +577,13 @@ class ReprojectionTask(MesoscopeTask):
         Parameters
         ----------
         clobber : bool
-            If True, re-download the file even if it exists locally.
+            If True, re-download the file even if it exists locally. Ignored on popeye, where
+            the file is always read directly from the histology folder.
 
         Returns
         -------
         one.alf.path.ALFPath
-            The local filepath of the aligned reference stack.
-            A uint16 array with shape (h, w, 3), comprising Allen atlas image volume indices for
-            dimensions representing (ml, ap, dv).  The first two dimensions (h, w) should equal
-            those of the reference stack.
+            The local filepath of the aligned reference stack file described above.
 
         Raises
         ------
@@ -737,6 +820,9 @@ class ReprojectionTask(MesoscopeTask):
         Each loader raises if its input is missing, so a silent return means the session is
         ready to be processed.
         """
+        # raw imaging metadata can be loaded
+        self.load_raw_imaging_metadata()
+
         # this session has a reference stack
         self.load_reference_stack()
 
@@ -749,7 +835,224 @@ class ReprojectionTask(MesoscopeTask):
         # the reference session has histology
         self.load_histology()
 
-    def tearDown(self):
-        for link in self.links:
-            link.unlink()
-        super().tearDown()
+    def pipeline(
+        self,
+        use_histology: bool = True,
+        lateral_correct: bool = True,
+        tilt_correct: bool = False,
+    ):
+        """Assign MLAPDV atlas coordinates to this session's imaging-plane pixels.
+
+        Each optional correction is attempted, and disabled with a logged warning if its
+        required input cannot be loaded: `use_histology` needs the reference session's
+        histology, `tilt_correct` needs the brain surface points, and `lateral_correct` needs
+        the reference session's reference stack to be present and of matching shape.
+
+        Parameters
+        ----------
+        use_histology : bool
+            If True, look up atlas ML/AP coordinates via the reference session's histology.
+            Required for depth (DV) assignment; if disabled, cell coordinates are not resolved.
+        lateral_correct : bool
+            If True, correct for the session-to-session lateral shift by registering this
+            session's reference stack onto the reference session's.
+        tilt_correct : bool
+            If True, correct apparent x/y/z shifts caused by tilt between the imaging plane
+            and the brain surface, using the reference stack's brain surface points.
+
+        Notes
+        -----
+        This method is still under development: it populates `coords[uuid]["mlapdv"]` per
+        FOV but does not yet return or persist the result.
+        """
+        # load the data
+        raw_imaging_meta = self.load_raw_imaging_metadata()
+        ref_img_stack = self.load_reference_stack()
+        ref_img_meta = self.load_reference_stack_metadata()
+
+        # attempting to load optional datasets and adjusting the pipeline accordingly
+        if use_histology:
+            try:
+                ref_img_histo_mlapdv = self.load_histology()
+            except Exception as e:
+                _logger.warning(
+                    f"attempted to use histology, but failed with {e.__class__.__name__}"
+                )
+                use_histology = False
+
+        try:
+            brain_surface_points = self.load_brain_surface_points(prefer="metadata")
+            has_brain_surface_points = True
+        except Exception as e:
+            _logger.warning(
+                f"attempted to load brain surface points, but failed with {e.__class__.__name__}"
+            )
+            has_brain_surface_points = False
+            if tilt_correct:
+                _logger.warning(
+                    "configured to use brain surface for tilt correction, fallback to no tilt correction"
+                )
+                tilt_correct = False
+
+        if lateral_correct:
+            try:
+                ref_sess_ref_stack = self.load_reference_session_reference_stack()
+                if ref_sess_ref_stack.shape != ref_img_stack.shape:
+                    _logger.warning(
+                        f"the reference stack of the reference session can be loaded, but is of incompatible shape: {ref_sess_ref_stack.shape} and the session: {ref_img_stack.shape}"
+                    )
+                    lateral_correct = False
+
+            except Exception as e:
+                _logger.warning(
+                    f"attempted to correct for session to session lateral shifts, but failed with {e.__class__.__name__}"
+                )
+                lateral_correct = False
+
+        fov_map = ibl.get_fov_map(raw_imaging_meta, self.session_path)
+
+        # coordinate systems
+        coordinate_systems_2d = scanimage.create_coordinate_systems_from_scanimage_meta(
+            raw_imaging_meta["rawScanImageMeta"],
+            fov_uuids=sorted(fov_map.values()),
+            dims=IBL_MESOSCOPE_DEFINITIONS["scanimage_dimensions"],
+        )
+
+        # load the reference image stack which is stored on disk in: dv,ml,ap
+        ref_img_size_px = np.array(ref_img_stack[0].shape)  # ml,ap
+
+        # image resolution and dimensions of the reference stack in um
+        um_per_px = scanimage.get_resolution_from_scanimage_meta(
+            ref_img_meta["rawScanImageMeta"],
+            dims=IBL_MESOSCOPE_DEFINITIONS["scanimage_dimensions"],
+        )
+        ref_img_size_um = ref_img_size_px * um_per_px
+        ref_img_topleft_ref, ref_img_ref_per_px = ibl.infer_ref_stack_virtual_corner(
+            ref_img_meta["rawScanImageMeta"],
+            ref_img_size_px,
+            dims=IBL_MESOSCOPE_DEFINITIONS["scanimage_dimensions"],
+        )
+
+        # the uncorrected 2D coordinate system of the reference image, i.e. before any
+        # tilt or lateral-shift correction is applied
+        coordinate_systems_ref = create_coordinate_system_for_image(
+            ref_img_size_px,
+            um_per_px,
+            ref_img_ref_per_px,
+            ref_img_topleft_ref,
+        )
+
+        # populating the coordinates dictionary holding all coordinates of all FOVs
+        coords = {}
+        n = raw_imaging_meta["rawScanImageMeta"]["Width"]
+        # this step requires Width == Height
+        # cannot be asserted here because of the format of the FOVs being stitched
+        # together vertically (mesoscope specific)
+        pixel_indices = np.array(list(product(range(n), repeat=2)), dtype="float")
+
+        # FIXME TODO remove this downsampling in production (here just debugging)
+        pixel_indices = pixel_indices[::1000]
+
+        for fov_uuid in fov_map.values():
+            coords[fov_uuid] = {}
+            coords[fov_uuid]["pixel"] = pixel_indices
+            # convert pixel indices to global um
+            coords[fov_uuid]["um_global"] = coordinate_systems_2d[fov_uuid].transform(
+                pixel_indices,
+                "pixel",
+                "um_global",
+            )
+
+        if has_brain_surface_points:
+            # this normal is expressed in the coordinate system of the reference stack
+            p_surface, n_surface, dv_avg = projections.get_brain_surface_normal(
+                brain_surface_points,
+                ref_img_meta,
+                coordinate_systems_ref,
+            )
+
+            # extract depths from scanimage metadata
+            fov_depths = scanimage.extract_fov_depths_from_scanimage_meta(
+                scanimage_meta=raw_imaging_meta["rawScanImageMeta"],
+                scanimage_params=raw_imaging_meta["scanImageParams"],
+                fov_uuids=fov_map.values(),
+            )
+
+            for fov_uuid in fov_map.values():
+                n = coords[fov_uuid]["pixel"].shape[0]
+                coords[fov_uuid]["dv_below_surface"] = np.ones(n) * np.absolute(
+                    fov_depths[fov_uuid] - dv_avg
+                )
+
+        if tilt_correct and has_brain_surface_points:
+            # this adds to the coords dictionary:
+            # 'um_corrected' - for apparent xy shift based on tilt
+            # 'dv_below_surface_corrected'  - for apparent z shift based on tilt
+            coords = projections.correct_coords_for_tilt_2d(
+                coords,
+                fov_depths,
+                p_surface,
+                n_surface,
+            )
+
+        if lateral_correct:
+            # get the transform for session to session correction
+            ref_transform = self.register_reference_stacks(
+                self.get_reference_stack_path(),
+                self.get_reference_session_reference_stack_path(),
+            )
+
+        if use_histology:
+            histo_interp_fn = self.interpolate_histology(
+                ref_img_histo_mlapdv, sigma=self.interpolation_sigma
+            )
+
+        # this is the atlas to project onto
+        atlas = ProjectionAtlas(res_um=ATLAS_RES)
+
+        for uuid in fov_map.values():
+            if tilt_correct:
+                # use the tilt-corrected um coordinates to transform back to reference-image px
+                px = coordinate_systems_ref.transform(
+                    coords[uuid]["um_corrected"], "um_global", "pixel"
+                )
+            else:
+                # otherwise, convert the FOV pixel directly to (fractional) reference-image px
+                px = coords[uuid]["pixel"]
+                coords_um_global = coordinate_systems_2d[uuid].transform(
+                    px, "pixel", "um_global"
+                )
+                px = coordinate_systems_ref.transform(
+                    coords_um_global, "um_global", "pixel"
+                )
+
+            # apply session to session correction
+            # (that is defined in pixel space)
+            if lateral_correct:
+                px = ref_transform(px)
+
+            # histo lookup
+            if use_histology:
+                mlap_interp = histo_interp_fn(px)
+            else:
+                # to be implemented here: mlap
+                raise NotImplementedError
+
+            # find point on surface
+            coords[uuid]["mlapdv_on_surface"] = atlas.get_dv_for_mlap(mlap_interp)
+
+            # project down into the brain; skipped entirely if no brain surface points are
+            # available, since depth below the surface is undefined without them
+            if has_brain_surface_points:
+                if tilt_correct:
+                    depths = coords[uuid]["dv_below_surface_corrected"]
+                else:
+                    depths = coords[uuid]["dv_below_surface"]
+
+                coords[uuid]["mlapdv"] = (  # TODO rename
+                    projections.project_down_from_surface(
+                        coords_on_surface=coords[uuid]["mlapdv_on_surface"],
+                        atlas=atlas,
+                        coords_depths=depths,
+                    )
+                )

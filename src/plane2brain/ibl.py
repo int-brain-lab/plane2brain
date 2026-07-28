@@ -23,10 +23,17 @@ def _eid2path(eid: str, one: ONE, location: str = "server") -> Path:
     return session_path
 
 
-def get_fov_map(raw_imaging_meta: dict) -> dict:
+def get_fov_map(
+    raw_imaging_meta: dict,
+    session_path: Path | None = None,  # optional, for verification
+) -> dict:
     # our fov names in ascending order
     fov_names = [f"FOV_0{i}" for i in range(len(raw_imaging_meta["FOV"]))]
-    # TODO glob here on the folder and compare
+    # if session path is given, check if metadata and extracted data
+    # contain the same FOVs
+    if session_path:
+        assert sorted(fov_names) == sorted((session_path / "alf").glob("FOV_*"))
+
     fov_uuids = [meta["roiUUID"] for meta in raw_imaging_meta["FOV"]]
     # fov_metas = [[meta for meta in scanimage_fov_metas if meta["roiUuid"] == uuid][0] for uuid in fov_uuids]
     # fov_depths = np.array([meta["zs"] for meta in fov_metas])
