@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from itertools import product
 from pathlib import Path
-from typing import Literal, Tuple
+from typing import Literal
 from uuid import UUID
 
 import numpy as np
@@ -18,7 +18,7 @@ from ibllib.oneibl.patcher import S3Patcher
 import one.alf.io as alfio
 from one.alf.spec import to_alf
 from mpci.alyx.tasks import MesoscopeTask
-from mpci.chronic.registration import MesoscopeFOV
+from mpci.chronic.registration.task import MesoscopeFOV
 from mpci.chronic.registration.scanimage import Provenance
 from mpci.scanimage.io import (
     patch_imaging_meta,
@@ -1112,7 +1112,9 @@ class ReprojectionTask(MesoscopeTask):
 
                 # get the center of the craniotomy
                 center_mlapdv = atlas.get_dv_for_mlap(
-                    ibl.load_reference_points_from_meta(ref_img_meta)["mlap"]
+                    ibl.load_reference_points_from_meta(ref_img_meta)["mlap"][
+                        np.newaxis, :
+                    ]
                 )[0]
                 # and it's brain normal
                 _, brain_normal = atlas.get_plane_at_point_mlap(*center_mlapdv[:-1])
@@ -1124,7 +1126,7 @@ class ReprojectionTask(MesoscopeTask):
                         "rotation"
                     ],
                     invert_dims=IBL_MESOSCOPE_DEFINITIONS["scanner_orientation"][
-                        "invert_dims"
+                        "invert_axis"
                     ],
                 )
                 coords[uuid]["mlapdv_on_surface"] = (

@@ -121,6 +121,9 @@ class ProjectionAtlas(AllenAtlas):
             except ValueError:
                 # TODO logger warn
                 coords_mlapdv[i, :] = np.nan
+            except SystemError:
+                # TODO logger warn
+                coords_mlapdv[i, :] = np.nan
 
         return coords_mlapdv
 
