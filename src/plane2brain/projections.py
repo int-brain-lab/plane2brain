@@ -9,7 +9,7 @@ from plane2brain.coordinate_systems import (
     setup_coordinate_systems_3d,
 )
 from plane2brain.linalg import (
-    intersect_line_mesh_nb,
+    intersect_line_mesh_precomputed_nb,
     intersect_line_plane,
     plane_normal_form,
 )
@@ -51,9 +51,10 @@ def project_coords_onto_atlas_surface(
         tqdm(coords_on_imaging_plane, desc="projecting on surface")
     ):
         try:
-            _, intersection_points, _ = intersect_line_mesh_nb(
+            _, intersection_points, _ = intersect_line_mesh_precomputed_nb(
                 atlas.mesh["vertices"],
                 atlas.mesh["edges"],
+                atlas.mesh["normals"],
                 _coords,
                 projection_vector * -1,
             )

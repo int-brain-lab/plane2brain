@@ -3,8 +3,8 @@ from iblatlas.atlas import AllenAtlas
 from scipy.spatial import ConvexHull
 
 from plane2brain.linalg import (
-    intersect_line_mesh_nb,
     intersect_line_mesh_np,
+    intersect_line_mesh_precomputed_nb,
     plane_normal_form,
 )
 
@@ -27,8 +27,21 @@ class ProjectionAtlas(AllenAtlas):
         """Compute the convex hull of surface points and store as a triangle mesh in `self.mesh`."""
         points = self.get_surface_points(dropna=True)
         hull = ConvexHull(points)
-        connectivity_list = hull.simplices
+        connectivity_list = hull.simplices.astype("int32")
         self.mesh = {"vertices": points, "edges": connectivity_list}
+        self.precompute_normals()
+
+    def precompute_normals(self) -> None:
+        """Compute the unit normal of every mesh face and store it in `self.mesh["normals"]`.
+
+        Face normals are otherwise recomputed on every single ray cast; caching
+        them lets intersect_line_mesh_precomputed_nb() skip that work.
+        """
+        faces = self.mesh["vertices"][self.mesh["edges"]]  # (F, 3, 3)
+        # same convention as linalg.plane_normal_form()
+        normals = np.cross(faces[:, 0] - faces[:, 1], faces[:, 0] - faces[:, 2])
+        normals /= np.linalg.norm(normals, axis=1, keepdims=True)
+        self.mesh["normals"] = normals
 
     def get_surface_points(self, dropna: bool = True) -> np.ndarray:
         """Return all brain surface points in micrometers.
@@ -59,7 +72,7 @@ class ProjectionAtlas(AllenAtlas):
         ml: float,
         ap: float,
         upwards: bool = True,
-        numba: bool = False,
+        numba: bool = True,
     ) -> tuple[np.ndarray, np.ndarray]:
         """Return the brain surface plane in normal form at a given ML/AP location.
 
@@ -70,7 +83,9 @@ class ProjectionAtlas(AllenAtlas):
             ml: Medial-lateral coordinate in µm.
             ap: Anterior-posterior coordinate in µm.
             upwards: If True, flip the normal so it points away from the brain (upwards).
-            numba: Use the Numba-accelerated mesh intersection. Defaults to False.
+            numba: Use the Numba-accelerated mesh intersection. Defaults to True;
+                the NumPy branch loops over all faces in Python and is orders of
+                magnitude slower, it is kept as a reference implementation.
 
         Returns:
             Tuple of (point on surface, surface normal), each of shape (3,) in µm.
@@ -80,10 +95,17 @@ class ProjectionAtlas(AllenAtlas):
         l0 = np.array([ml, ap, 1000.0])
         l = np.array([0.0, 0.0, -1.0])
         if numba:
-            func = intersect_line_mesh_nb
+            faces, ips, _ = intersect_line_mesh_precomputed_nb(
+                self.mesh["vertices"],
+                self.mesh["edges"],
+                self.mesh["normals"],
+                l0,
+                l,
+            )
         else:
-            func = intersect_line_mesh_np
-        faces, ips, _ = func(self.mesh["vertices"], self.mesh["edges"], l0, l)
+            faces, ips, _ = intersect_line_mesh_np(
+                self.mesh["vertices"], self.mesh["edges"], l0, l
+            )
         # pick the intersection point nearest the starting point of the ray
         ix = np.argmin(np.linalg.norm(ips - l0, axis=1))
         face = faces[ix]
@@ -109,9 +131,10 @@ class ProjectionAtlas(AllenAtlas):
         for i, _coords in enumerate(coords_mlap):
             _coords = np.append(_coords, 0.0)
             try:
-                _, intersection_points, _ = intersect_line_mesh_nb(
+                _, intersection_points, _ = intersect_line_mesh_precomputed_nb(
                     self.mesh["vertices"],
                     self.mesh["edges"],
+                    self.mesh["normals"],
                     _coords,
                     np.array([0.0, 0.0, -1.0]),
                 )
