@@ -3,22 +3,40 @@ from __future__ import annotations
 import json
 from itertools import product
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Tuple
 from uuid import UUID
 
 import numpy as np
 import tifffile
 from iblatlas.atlas import MRITorontoAtlas
-from ibllib.oneibl import data_handlers
-from ibllib.oneibl.data_handlers import ExpectedDataset, ServerGlobusDataHandler
+from ibllib.oneibl.data_handlers import (
+    ExpectedDataset,
+    ServerGlobusDataHandler,
+    PopeyeDataHandler,
+)
+from ibllib.oneibl.patcher import S3Patcher
+import one.alf.io as alfio
+from one.alf.spec import to_alf
 from mpci.alyx.tasks import MesoscopeTask
+from mpci.chronic.registration import MesoscopeFOV
+from mpci.chronic.registration.scanimage import Provenance
+from mpci.scanimage.io import (
+    patch_imaging_meta,
+    get_px_per_um,
+    get_window_center,
+    get_window_px,
+)
+
 from one.alf.path import ALFPath
 from one.api import ONE
 from skimage.transform import ProjectiveTransform
 
 from plane2brain import ibl, projections, scanimage
 from plane2brain.atlas import ProjectionAtlas
-from plane2brain.coordinate_systems import create_coordinate_system_for_image
+from plane2brain.coordinate_systems import (
+    create_coordinate_system_for_image,
+    setup_coordinate_systems_3d,
+)
 from plane2brain.registration import (
     apply_transform,
     evaluate,
@@ -37,10 +55,6 @@ IBL_MESOSCOPE_DEFINITIONS = {
 import logging
 
 _logger = logging.getLogger(__name__)
-ATLAS_RES = 25
-
-from ibllib.oneibl.data_handlers import PopeyeDataHandler
-from ibllib.oneibl.patcher import S3Patcher
 
 
 class PopeyeS3DataHandler(PopeyeDataHandler):
@@ -85,6 +99,8 @@ class ReprojectionTask(MesoscopeTask):
         raw_imaging_collection: str | None = None,
         reference_session_raw_imaging_collection: str | None = None,
         interpolation_sigma=25,
+        histology_atlas_resolution=25,  # atlas resolution for histology (depends on steven)
+        projection_atlas_resolution=25,  # atlas resolution for the projection
         **kwargs,
     ):
         """Initialize the task with this session's and the reference session's identifiers.
@@ -133,6 +149,8 @@ class ReprojectionTask(MesoscopeTask):
         self.links: list[Path] = []
 
         self.interpolation_sigma = interpolation_sigma
+        self.histology_atlas_resolution = histology_atlas_resolution
+        self.projection_atlas_resolution = projection_atlas_resolution
 
     def tearDown(self):
         """Unlink any symlinks created during the task, then run the default teardown."""
@@ -142,28 +160,72 @@ class ReprojectionTask(MesoscopeTask):
 
     @property
     def signature(self):
-        """Build the task's expected input and output dataset signature."""
-        I = ExpectedDataset.input
-        O = ExpectedDataset.output
-
+        I = ExpectedDataset.input  # noqa
+        O = ExpectedDataset.output  # noqa
         signature = {
             "input_files": [
                 I("_ibl_rawImagingData.meta.json", self.raw_imaging_collection, True),
+                I("mpciROIs.stackPos.npy", "alf/FOV*", True),
+                # New additions  # FIXME should be self.device_collection (may require patching exp desc files)
                 I(
                     "referenceImage.stack.tif",
                     f"{self.raw_imaging_collection}/reference",
                     True,
+                    unique=True,
                 ),
                 I(
                     "referenceImage.meta.json",
                     f"{self.raw_imaging_collection}/reference",
                     True,
+                    unique=True,
+                ),
+                I(
+                    "referenceImage.points.json",
+                    f"{self.raw_imaging_collection}/reference",
+                    False,
+                    unique=True,
                 ),
             ],
-            "output_files": [],  # TODO ask about ExpectedDataset.output (or rather the lack of them)
+            "output_files": [
+                O("mpciMeanImage.brainLocationIds.npy", "alf/FOV_*", True),
+                ("mpciMeanImage.mlapdv.npy", "alf/FOV_*", True),
+                ("mpciROIs.mlapdv.npy", "alf/FOV_*", True),
+                ("mpciROIs.brainLocationIds.npy", "alf/FOV_*", True),
+                ("_ibl_rawImagingData.meta.json", self.raw_imaging_collection, True),
+                (
+                    "referenceImage.meta.json",
+                    f"{self.raw_imaging_collection}/reference",
+                    True,
+                ),
+            ],
         }
-
+        # TODO This should be updated to handle changes in provenance suffix and device collection
         return signature
+
+    # @property
+    # def signature(self):
+    #     """Build the task's expected input and output dataset signature."""
+    #     I = ExpectedDataset.input
+    #     O = ExpectedDataset.output
+
+    #     signature = {
+    #         "input_files": [
+    #             I("_ibl_rawImagingData.meta.json", self.raw_imaging_collection, True),
+    #             I(
+    #                 "referenceImage.stack.tif",
+    #                 f"{self.raw_imaging_collection}/reference",
+    #                 True,
+    #             ),
+    #             I(
+    #                 "referenceImage.meta.json",
+    #                 f"{self.raw_imaging_collection}/reference",
+    #                 True,
+    #             ),
+    #         ],
+    #         "output_files": [],  # TODO ask about ExpectedDataset.output (or rather the lack of them)
+    #     }
+
+    #     return signature
 
     def validate_reference_session(self, reference_session_eid: str | UUID) -> UUID:
         """Check that the reference session belongs to the same subject as this session.
@@ -384,7 +446,7 @@ class ReprojectionTask(MesoscopeTask):
         self.links.append(symlinked_reference_stack)
         return symlinked_reference_stack
 
-    def load_histology(self) -> np.ndarray:
+    def load_histology(self) -> tuple[np.darray, np.npdarray]:
         """Load the MLAPDV coordinates of the reference session's reference image.
 
         Returns
@@ -393,11 +455,12 @@ class ReprojectionTask(MesoscopeTask):
             Array with shape (h, w, 3) holding the (ml, ap, dv) coordinates in μm of each
             pixel of the reference session's reference image.
         """
-        atlas = MRITorontoAtlas(res_um=25)
+        atlas = MRITorontoAtlas(res_um=self.histology_atlas_resolution)
         local_histo_path = self._get_atlas_registered_reference_mlap()
         ccf_idx = np.load(local_histo_path)
 
         # flip the ap axis to match the atlas volume orientation
+        # TODO inspect here: this is an AI generated comment and there is no axis flip happening
         ccf_idx[:, :, 1] = np.abs(
             ccf_idx[:, :, 1].astype("int64") - atlas.label.shape[0]
         ).astype(ccf_idx.dtype)
@@ -405,7 +468,7 @@ class ReprojectionTask(MesoscopeTask):
         ref_img_histo_mlapdv = (
             atlas.ccf2xyz(ccf_idx * atlas.res_um, ccf_order="mlapdv") * 1e6
         )  # m -> μm
-        return ref_img_histo_mlapdv
+        return ref_img_histo_mlapdv, ccf_idx
 
     @staticmethod
     def interpolate_histology(
@@ -614,7 +677,7 @@ class ReprojectionTask(MesoscopeTask):
             "output_files": [],
         }
         if self.location == "server" and self.force:
-            handler = data_handlers.ServerGlobusDataHandler(
+            handler = ServerGlobusDataHandler(
                 self.reference_session_path, signature, one=self.one
             )
         else:
@@ -841,6 +904,7 @@ class ReprojectionTask(MesoscopeTask):
         use_histology: bool = True,
         lateral_correct: bool = True,
         tilt_correct: bool = False,
+        debug: bool = False,  # debug flag: just downsample
     ):
         """Assign MLAPDV atlas coordinates to this session's imaging-plane pixels.
 
@@ -874,7 +938,7 @@ class ReprojectionTask(MesoscopeTask):
         # attempting to load optional datasets and adjusting the pipeline accordingly
         if use_histology:
             try:
-                ref_img_histo_mlapdv = self.load_histology()
+                ref_img_histo_mlapdv, ref_img_histo_idx = self.load_histology()
             except Exception as e:
                 _logger.warning(
                     f"attempted to use histology, but failed with {e.__class__.__name__}"
@@ -910,7 +974,7 @@ class ReprojectionTask(MesoscopeTask):
                 )
                 lateral_correct = False
 
-        fov_map = ibl.get_fov_map(raw_imaging_meta, self.session_path)
+        fov_map = ibl.get_fov_map(raw_imaging_meta)
 
         # coordinate systems
         coordinate_systems_2d = scanimage.create_coordinate_systems_from_scanimage_meta(
@@ -945,14 +1009,17 @@ class ReprojectionTask(MesoscopeTask):
 
         # populating the coordinates dictionary holding all coordinates of all FOVs
         coords = {}
-        n = raw_imaging_meta["rawScanImageMeta"]["Width"]
+        n_px_per_row = raw_imaging_meta["rawScanImageMeta"]["Width"]
         # this step requires Width == Height
         # cannot be asserted here because of the format of the FOVs being stitched
         # together vertically (mesoscope specific)
-        pixel_indices = np.array(list(product(range(n), repeat=2)), dtype="float")
+        pixel_indices = np.array(
+            list(product(range(n_px_per_row), repeat=2)), dtype="float"
+        )
 
         # FIXME TODO remove this downsampling in production (here just debugging)
-        pixel_indices = pixel_indices[::1000]
+        if debug:
+            pixel_indices = pixel_indices[::1000]
 
         for fov_uuid in fov_map.values():
             coords[fov_uuid] = {}
@@ -1009,7 +1076,7 @@ class ReprojectionTask(MesoscopeTask):
             )
 
         # this is the atlas to project onto
-        atlas = ProjectionAtlas(res_um=ATLAS_RES)
+        atlas = ProjectionAtlas(res_um=self.projection_atlas_resolution)
 
         for uuid in fov_map.values():
             if tilt_correct:
@@ -1035,14 +1102,39 @@ class ReprojectionTask(MesoscopeTask):
             # histo lookup
             if use_histology:
                 mlap_interp = histo_interp_fn(px)
+                # find point on surface
+                coords[uuid]["mlapdv_on_surface"] = atlas.get_dv_for_mlap(
+                    mlap_interp  # + 1e-6
+                )  # TODO trace back what those were for - I think not necessary since we are extrapolating now
             else:
-                # to be implemented here: mlap
-                raise NotImplementedError
+                # if no histology is present - do the vanilla projection along the brain normal
+                # this assumes the optical axis and the brain normal are in alignment
 
-            # find point on surface
-            coords[uuid]["mlapdv_on_surface"] = atlas.get_dv_for_mlap(
-                mlap_interp  # + 1e-6
-            )  # TODO trace back what those were for
+                # get the center of the craniotomy
+                center_mlapdv = atlas.get_dv_for_mlap(
+                    ibl.load_reference_points_from_meta(ref_img_meta)["mlap"]
+                )[0]
+                # and it's brain normal
+                _, brain_normal = atlas.get_plane_at_point_mlap(*center_mlapdv[:-1])
+                # setup the projection
+                coordinate_systems_3d = setup_coordinate_systems_3d(
+                    center_mlapdv,
+                    brain_normal,
+                    rotate_by=IBL_MESOSCOPE_DEFINITIONS["scanner_orientation"][
+                        "rotation"
+                    ],
+                    invert_dims=IBL_MESOSCOPE_DEFINITIONS["scanner_orientation"][
+                        "invert_dims"
+                    ],
+                )
+                coords[uuid]["mlapdv_on_surface"] = (
+                    projections.project_coords_onto_atlas_surface(
+                        coords[uuid]["um_global"],
+                        coordinate_systems_3d=coordinate_systems_3d,
+                        atlas=atlas,
+                        projection_vector=brain_normal,
+                    )
+                )
 
             # project down into the brain; skipped entirely if no brain surface points are
             # available, since depth below the surface is undefined without them
@@ -1059,4 +1151,278 @@ class ReprojectionTask(MesoscopeTask):
                         coords_depths=depths,
                     )
                 )
+        # persistence for debugging
         self.coords = coords
+
+    # def write_outputs(self, coords: dict[str, np.ndarray]):
+    #     raw_imaging_meta = self.load_raw_imaging_metadata()
+    #     fov_map = ibl.get_fov_map(raw_imaging_meta)
+    #     n_px_per_row = raw_imaging_meta["rawScanImageMeta"]["Width"]
+    #     # the lookup has to be done on the atlas thas was used for histology
+    #     # FIXME this is dependent on the use_histology flag
+    #     atlas = MRITorontoAtlas(res_um=self.histology_atlas_resolution)
+
+    #     # save outputs
+    #     for fov_name, fov_uuid in fov_map.items():
+    #         # mpciMeanImage.mlapdv
+    #         mpciMeanImage = np.reshape(
+    #             coords[fov_uuid]["mlapdv"], (n_px_per_row, n_px_per_row, 3)
+    #         )
+    #         save_path = (
+    #             self.session_path / "alf" / fov_name / "mpciMeanImage.mlapdv.npy"
+    #         )
+    #         np.save(
+    #             save_path,
+    #             mpciMeanImage,
+    #         )
+
+    #         # mpciMeanImage.brainLocationIds_ccf_2017s_ccf_2017.npy
+    #         brainLocationIds = atlas.get_labels(mpciMeanImage / 1e6, mode="clip")
+    #         save_path = (
+    #             self.session_path
+    #             / "alf"
+    #             / fov_name
+    #             / "mpciMeanImage.brainLocationIds_ccf_2017.npy"
+    #         )
+    #         np.save(
+    #             save_path,
+    #             brainLocationIds,
+    #         )
+
+    def update_craniotomy_center(
+        self,
+        reference_image_meta: dict,
+        reference_session_reference_stack_mlapdv: np.ndarray,
+    ):
+        """Update subject JSON with atlas-aligned craniotomy coordinates."""
+        assert not self.one.offline
+        # Get the pixel coordinates of the craniotomy center in the reference image
+        px_per_um = get_px_per_um(reference_image_meta)
+        um_per_px = 1 / px_per_um
+
+        ref_stack_n_px = np.array(
+            reference_session_reference_stack_mlapdv.shape[:2]
+        )  # in (y, x)
+        craniotomy_center_offset = np.flip(
+            get_window_center(reference_image_meta) * 1e3
+        )  # (y, x) center offset mm -> μm
+
+        image_center_px = ref_stack_n_px / 2
+        # TODO Verify whether offset is added or subtracted
+        #  empirically, it seems to be added looking at SP037/2023-02-20/001
+        craniotomy_pixel = image_center_px + (craniotomy_center_offset / um_per_px)
+        craniotomy_pixel = np.round(craniotomy_pixel).astype(
+            int
+        )  # convert to pixel coordinates
+        _logger.debug("Craniotomy pixel coordinates: (%d, %d)", *craniotomy_pixel)
+
+        # This doesn't work in python 3.10, numpy 2.24
+        # craniotomy_resolved = referenceImage['mlapdv'][craniotomy_pixel] / 1e3  # py 3.11 # ML AP DV, μm -> mm
+        craniotomy_resolved = (
+            reference_session_reference_stack_mlapdv[
+                craniotomy_pixel[0], craniotomy_pixel[1]
+            ]
+            / 1e3
+        )
+
+        # Update metadata
+        reference_image_meta["centerMM"]["ML_resolved"] = craniotomy_resolved[0]
+        reference_image_meta["centerMM"]["AP_resolved"] = craniotomy_resolved[1]
+        meta_path = next(
+            self.session_path.glob(
+                f"{self.raw_imaging_collection}/reference/referenceImage.meta.json"
+            )
+        )
+        with open(meta_path, "w") as f:
+            json.dump(reference_image_meta, f)
+
+        subject = self.session_path.subject
+        subject_json = self.one.alyx.rest("subjects", "read", id=subject)["json"]
+        # TODO Assert only one craniotomy key
+        if sum(k.startswith("craniotomy_") for k in subject_json.keys()) > 1:
+            raise NotImplementedError("Multiple craniotomies found")
+        data = {"craniotomy_00": subject_json["craniotomy_00"].copy()}
+        data["craniotomy_00"]["center_resolved"] = np.round(
+            craniotomy_resolved[:2], 3
+        ).tolist()
+
+        # Update the subject JSON if processing the reference session
+        # i.e. the session with the histology-aligned reference stack
+        if self.reference_session and (
+            self.reference_session.session_parts == self.session_path.session_parts
+        ):
+            _logger.info("Updating craniotomy center in subject JSON for %s", subject)
+            self.one.alyx.json_field_update("subjects", subject, data=data)
+
+        _logger.info(
+            "Craniotomy target: (%.2f, %.2f), actual: (%.2f, %.2f), difference: (%.2f, %.2f)",
+            *subject_json["craniotomy_00"]["center"],
+            *data["craniotomy_00"]["center_resolved"],
+            *np.array(subject_json["craniotomy_00"]["center"])
+            - craniotomy_resolved[:2],
+        )
+        return craniotomy_resolved
+
+    def _run(self):
+        # self.atlas = MRITorontoAtlas(
+        #     res_um=atlas_resolution
+        # )  # TODO Check scaling appied to underlying volume
+        # Load the reference stack & (down)load the registered MLAPDV coordinates
+        # reference_image = self.load_reference_stack()
+        reference_image_meta = self.load_reference_stack_metadata()
+        reference_session_reference_image_mlapdv = self.load_histology()
+
+        # Load main meta
+        _, meta_files, _ = self.input_files[0].find_files(self.session_path)
+        meta = patch_imaging_meta(alfio.load_file_content(meta_files[0]) or {})
+        nFOV = len(meta.get("FOV", []))
+        if self.provenance is Provenance.HISTOLOGY:
+            _logger.info("Extracting histology MLAPDV datasets")
+            # Update the craniotomy center
+            self.update_craniotomy_center(
+                reference_image_meta, reference_session_reference_image_mlapdv
+            )
+            meta["centerMM"] = reference_image_meta["centerMM"]
+            with open(meta_files[0], "w") as fp:
+                json.dump(meta, fp)
+            # Add reference meta data to meta_files list for registration
+            meta_files.append(
+                next(
+                    self.session_path.glob(
+                        f"{self.raw_imaging_collection}/reference/referenceImage.meta.json"
+                    )
+                )
+            )
+            # Interpolate the FOVs to the reference stack
+        #     mlapdv = self.interpolate_FOVs_smooth(reference_image, meta)
+        # elif "points" in reference_image["meta"]:
+        #     _logger.info("Extracting estimate MLAPDV datasets")
+        #     mlapdv, _ = self.project_mlapdv(
+        #         meta, atlas=self.atlas, provenance=self.provenance
+        #     )
+        #     # Convert to list of arrays for processing
+        #     mlapdv = [mlapdv[i] for i in range(nFOV)]
+        # else:
+        #     _logger.warning(
+        #         "No reference image points found; will not account for optical plane tilt"
+        #     )
+        #     return super()._run(*args)
+
+        # Account for optical plane tilt
+        # mlapdv_rel = self.correct_fov_depth_and_surface_projection(
+        #     mlapdv, meta, reference_image
+        # )
+        # mean_image_mlapdv = self.project_mlapdv_from_surface(mlapdv_rel)
+
+        # Because generating the projected coordinates takes so long, for now we will save them
+        # _logger.info(
+        #     "Saving mlapdv projection file to %s",
+        #     self.session_path / "mlapdv_projection.pkl",
+        # )
+        # with open(self.session_path / "mlapdv_projection.pkl", "wb") as fp:
+        #     pickle.dump((mlapdv_rel, mean_image_mlapdv), fp)
+
+        # Look up brain location IDs from coordinates
+        # mean_image_ids = []
+        # for xyz in mean_image_mlapdv:
+        #     labels = self.atlas.get_labels(xyz.reshape(-1, 3) / 1e6)  # in m
+        #     mean_image_ids.append(labels.reshape(xyz.shape[:2]))
+
+        # Update the FOV meta data fields (used in register_fov)
+        # for i, fov in enumerate(meta.get("FOV", [])):
+        raw_imaging_meta = self.load_raw_imaging_metadata()
+        fov_map = ibl.get_fov_map(raw_imaging_meta)
+
+        # the atlas for the lookup
+        atlas = MRITorontoAtlas(res_um=self.histology_atlas_resolution)
+
+        # store the outputs
+        mean_images_mlapdv = {}
+        mean_images_ids = {}
+        for fov_uuid, fov_name in fov_map.items():
+            n_px_per_row = raw_imaging_meta["rawScanImageMeta"]["Width"]
+            mean_image_mlapdv = np.reshape(
+                self.coords[fov_uuid], (n_px_per_row, n_px_per_row, 3)
+            )
+            mean_images_mlapdv[fov_uuid] = mean_image_mlapdv
+            mean_images_ids[fov_uuid] = atlas.get_labels(
+                mean_image_mlapdv / 1e6, mode="clip"
+            )
+
+        for fov_uuid, fov_name in fov_map.items():
+            fov = meta[fov_name]
+            if "MLAPDV" not in fov:
+                fov["MLAPDV"] = {}
+                fov["brainLocationIds"] = {}
+            fov["MLAPDV"][self.provenance.name.lower()] = {
+                "topLeft": mean_images_mlapdv[fov_uuid][0, 0, :].tolist(),
+                "topRight": mean_images_mlapdv[fov_uuid][0, -1, :].tolist(),
+                "bottomLeft": mean_images_mlapdv[fov_uuid][-1, 0, :].tolist(),
+                "bottomRight": mean_images_mlapdv[fov_uuid][-1, -1, :].tolist(),
+                "center": mean_images_mlapdv[fov_uuid][
+                    round(mean_images_mlapdv[fov_uuid].shape[0] / 2) - 1,
+                    round(mean_images_mlapdv[fov_uuid].shape[1] / 2) - 1,
+                    :,
+                ].tolist(),
+            }
+            fov["brainLocationIds"][self.provenance.name.lower()] = {
+                "topLeft": int(mean_images_ids[fov_uuid][0, 0]),
+                "topRight": int(mean_images_ids[fov_uuid][0, -1]),
+                "bottomLeft": int(mean_images_ids[fov_uuid][-1, 0]),
+                "bottomRight": int(mean_images_ids[fov_uuid][-1, -1]),
+                "center": int(
+                    mean_images_ids[fov_uuid][
+                        round(mean_images_ids[fov_uuid].shape[0] / 2) - 1,
+                        round(mean_images_ids[fov_uuid].shape[1] / 2),
+                    ]
+                ),
+            }
+
+        # Save the mean image datasets
+        suffix = (
+            None
+            if self.provenance is Provenance.HISTOLOGY
+            else self.provenance.name.lower()
+        )
+        mean_image_files = []
+        assert len(mean_image_mlapdv) == nFOV
+        for i in range(nFOV):
+            alf_path = self.session_path.joinpath("alf", f"FOV_{i:02}")
+            alf_path.mkdir(parents=True, exist_ok=True)
+            for attr, arr, sfx in (
+                ("mlapdv", mean_image_mlapdv[i], suffix),
+                (
+                    "brainLocationIds",
+                    mean_images_ids[fov_uuid],
+                    ("ccf", "2017", suffix),
+                ),
+            ):
+                mean_image_files.append(
+                    alf_path / to_alf("mpciMeanImage", attr, "npy", timescale=sfx)
+                )
+                np.save(mean_image_files[-1], arr)
+
+        # Extract ROI MLAPDV coordinates and brain location IDs
+        roi_mlapdv, roi_brain_ids = self.roi_mlapdv(nFOV, suffix=suffix)
+
+        # Write MLAPDV + brain location ID of ROIs to disk
+        roi_files = []
+        assert (
+            set(roi_mlapdv.keys()) == set(roi_brain_ids.keys())
+            and len(roi_mlapdv) == nFOV
+        )
+        for i in range(nFOV):
+            alf_path = self.session_path.joinpath("alf", f"FOV_{i:02}")
+            for attr, arr, sfx in (
+                ("mlapdv", roi_mlapdv[i], suffix),
+                ("brainLocationIds", roi_brain_ids[i], ("ccf", "2017", suffix)),
+            ):
+                roi_files.append(
+                    alf_path / to_alf("mpciROIs", attr, "npy", timescale=sfx)
+                )
+                np.save(roi_files[-1], arr)
+
+        # Register FOVs in Alyx
+        self.register_fov(meta, self.provenance)
+
+        return sorted([*meta_files, *roi_files, *mean_image_files])
