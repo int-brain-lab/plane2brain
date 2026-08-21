@@ -18,6 +18,13 @@ build-backend = "pdm.backend"
 [tool.pdm]
 distribution = true
 
+[tool.ruff]
+exclude = [
+    "src/scripts",
+]
+
+[tool.ruff.lint]
+ignore = ["E741"]
 
 [dependency-groups]
 lint = ["ruff>=0.7.3"]
