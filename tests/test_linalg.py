@@ -1,3 +1,5 @@
+"""Tests for plane2brain.linalg."""
+
 import unittest
 
 import numpy as np
@@ -20,7 +22,8 @@ from plane2brain.linalg import (
 )
 
 
-def _unit_cube_mesh():
+def _unit_cube_mesh() -> tuple[np.ndarray, np.ndarray]:
+    """Return the vertices and faces (vertex indices) of the cube [-1, 1]^3."""
     # 8 vertices of the unit cube [-1, 1]^3, triangulated into 12 faces
     # (2 per cube face). edges is int32 because intersect_line_mesh_nb's numba
     # signature pins that dtype.
@@ -56,7 +59,8 @@ def _unit_cube_mesh():
     return vertices, edges
 
 
-def _face_normals(vertices, edges):
+def _face_normals(vertices: np.ndarray, edges: np.ndarray) -> np.ndarray:
+    """Return the unit normal of each face of a mesh."""
     # mirrors ProjectionAtlas.precompute_normals()
     faces = vertices[edges]
     normals = np.cross(faces[:, 0] - faces[:, 1], faces[:, 0] - faces[:, 2])
@@ -64,7 +68,9 @@ def _face_normals(vertices, edges):
 
 
 class TestPlaneNormalForm(unittest.TestCase):
-    def test_known_triangle_returns_first_vertex_and_unit_normal(self):
+    """Tests for the normal form of a triangle."""
+
+    def test_known_triangle_returns_first_vertex_and_unit_normal(self) -> None:
         # xy-plane triangle: normal should be along ±z with unit length
         face = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
         p0, n = plane_normal_form(face)
@@ -74,7 +80,9 @@ class TestPlaneNormalForm(unittest.TestCase):
 
 
 class TestIntersectLinePlane(unittest.TestCase):
-    def test_golden_case(self):
+    """Tests for line-plane intersections."""
+
+    def test_golden_case(self) -> None:
         # z-axis line piercing the z = 5 plane -> intersection at (0, 0, 5)
         l0 = np.array([0.0, 0.0, 0.0])
         l = np.array([0.0, 0.0, 1.0])
@@ -84,7 +92,7 @@ class TestIntersectLinePlane(unittest.TestCase):
             intersect_line_plane(l0, l, p0, n, warn=False), [0.0, 0.0, 5.0]
         )
 
-    def test_np_and_nb_agree(self):
+    def test_np_and_nb_agree(self) -> None:
         l0 = np.array([1.0, 2.0, 0.0])
         l = np.array([0.0, 0.0, 1.0])
         p0 = np.array([0.0, 0.0, 5.0])
@@ -96,12 +104,14 @@ class TestIntersectLinePlane(unittest.TestCase):
 
 
 class TestPointInFace(unittest.TestCase):
-    def test_centroid_is_inside(self):
+    """Tests for the point-in-triangle test."""
+
+    def test_centroid_is_inside(self) -> None:
         face = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
         centroid = face.mean(axis=0)
         self.assertTrue(bool(point_in_face(face, centroid)))
 
-    def test_vertex_is_not_inside(self):
+    def test_vertex_is_not_inside(self) -> None:
         # point_in_face uses strict 0 < w < 1; a vertex has barycentric weight 1
         # on itself and 0 on the others, so it returns False — boundary points
         # are not "inside"
@@ -110,12 +120,14 @@ class TestPointInFace(unittest.TestCase):
 
 
 class TestPointInFaceBarycentric(unittest.TestCase):
-    def test_centroid_and_vertex_match_reference_semantics(self):
+    """Tests for the barycentric point-in-triangle test."""
+
+    def test_centroid_and_vertex_match_reference_semantics(self) -> None:
         face = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
         self.assertTrue(bool(point_in_face_barycentric(face, face.mean(axis=0))))
         self.assertFalse(bool(point_in_face_barycentric(face, face[0])))
 
-    def test_agrees_with_pinv_version_on_random_in_plane_points(self):
+    def test_agrees_with_pinv_version_on_random_in_plane_points(self) -> None:
         # the barycentric version is only equivalent for points in the plane of
         # the face, so points are built from random barycentric weights.
         # the weight range straddles 0 and 1 so roughly half the points fall
@@ -135,7 +147,7 @@ class TestPointInFaceBarycentric(unittest.TestCase):
         # guard against the assertions passing trivially on all-outside points
         self.assertGreater(n_inside, n_cases // 10)
 
-    def test_degenerate_face_is_rejected(self):
+    def test_degenerate_face_is_rejected(self) -> None:
         # collinear vertices have zero area; the pinv version returns some
         # minimum-norm solution there, this one rejects the face outright
         face = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
@@ -146,7 +158,9 @@ class TestPointInFaceBarycentric(unittest.TestCase):
 
 
 class TestIntersectLineMesh(unittest.TestCase):
-    def test_vertical_ray_through_cube_returns_two_intersections(self):
+    """Tests for line-mesh intersections, NumPy, Numba and precomputed."""
+
+    def test_vertical_ray_through_cube_returns_two_intersections(self) -> None:
         # ray slightly off-axis to avoid the diagonal where the two bottom
         # triangles meet (point_in_face is strict-inequality so points on the
         # shared edge are rejected from both triangles)
@@ -160,7 +174,7 @@ class TestIntersectLineMesh(unittest.TestCase):
         z_values = sorted(intersection_points[:, 2].tolist())
         nptest.assert_array_almost_equal(z_values, [-1.0, 1.0])
 
-    def test_ray_missing_mesh_returns_empty_arrays(self):
+    def test_ray_missing_mesh_returns_empty_arrays(self) -> None:
         # this is the load-bearing case for the `except ValueError` branch in
         # projections.project_coords_onto_atlas_surface — empty `faces` then
         # makes downstream np.argmin raise ValueError
@@ -174,7 +188,7 @@ class TestIntersectLineMesh(unittest.TestCase):
         self.assertEqual(faces.shape[0], 0)
         self.assertEqual(ix.shape[0], 0)
 
-    def test_np_and_nb_agree_on_cube(self):
+    def test_np_and_nb_agree_on_cube(self) -> None:
         vertices, edges = _unit_cube_mesh()
         line_point = np.array([0.1, 0.3, -10.0])
         line_vector = np.array([0.0, 0.0, 1.0])
@@ -184,7 +198,7 @@ class TestIntersectLineMesh(unittest.TestCase):
             sorted(np_ips[:, 2].tolist()), sorted(nb_ips[:, 2].tolist())
         )
 
-    def test_precomputed_agrees_with_nb_on_random_mesh_and_rays(self):
+    def test_precomputed_agrees_with_nb_on_random_mesh_and_rays(self) -> None:
         # intersect_line_mesh_precomputed_nb inlines the maths of
         # point_in_face_barycentric() and intersect_line_plane_nb() by hand, so
         # it is checked against the reference implementation over a mesh with
@@ -217,7 +231,7 @@ class TestIntersectLineMesh(unittest.TestCase):
         # guard against the assertions passing trivially on rays that all miss
         self.assertGreater(n_hits, 50)
 
-    def test_precomputed_normals_agree_with_nb(self):
+    def test_precomputed_normals_agree_with_nb(self) -> None:
         # the precomputed variant must be a drop-in for intersect_line_mesh_nb
         vertices, edges = _unit_cube_mesh()
         normals = _face_normals(vertices, edges)
@@ -236,24 +250,28 @@ class TestIntersectLineMesh(unittest.TestCase):
 
 
 class TestGetAngle(unittest.TestCase):
-    def test_parallel_vectors_give_zero(self):
+    """Tests for the angle between two vectors."""
+
+    def test_parallel_vectors_give_zero(self) -> None:
         a = np.array([1.0, 0.0, 0.0])
         b = np.array([2.0, 0.0, 0.0])
         self.assertAlmostEqual(get_angle(a, b), 0.0)
 
-    def test_anti_parallel_vectors_give_pi(self):
+    def test_anti_parallel_vectors_give_pi(self) -> None:
         a = np.array([1.0, 0.0, 0.0])
         b = np.array([-1.0, 0.0, 0.0])
         self.assertAlmostEqual(get_angle(a, b), np.pi)
 
-    def test_perpendicular_vectors_give_pi_over_two(self):
+    def test_perpendicular_vectors_give_pi_over_two(self) -> None:
         a = np.array([1.0, 0.0, 0.0])
         b = np.array([0.0, 1.0, 0.0])
         self.assertAlmostEqual(get_angle(a, b), np.pi / 2)
 
 
 class TestFindClosestPointFromLine(unittest.TestCase):
-    def test_picks_nearest_perpendicular_point(self):
+    """Tests for finding the point closest to a line."""
+
+    def test_picks_nearest_perpendicular_point(self) -> None:
         # candidates at perpendicular distances 0.5, 1.0, 2.0 from the z-axis
         points = np.array(
             [
@@ -268,7 +286,7 @@ class TestFindClosestPointFromLine(unittest.TestCase):
             find_closest_point_from_line_np(points, l0, l), [0.5, 0.0, 0.0]
         )
 
-    def test_np_and_nb_agree(self):
+    def test_np_and_nb_agree(self) -> None:
         points = np.array(
             [
                 [0.5, 0.0, 0.0],
@@ -285,14 +303,16 @@ class TestFindClosestPointFromLine(unittest.TestCase):
 
 
 class TestGetRotationBetweenVectors(unittest.TestCase):
-    def test_maps_a_to_b(self):
+    """Tests for the rotation mapping one vector onto another."""
+
+    def test_maps_a_to_b(self) -> None:
         # R @ a ≈ b when a, b are unit vectors that are not (anti-)parallel
         a = np.array([1.0, 0.0, 0.0])
         b = np.array([0.0, 1.0, 0.0])
         R = get_rotation_between_vectors(a, b, as_affine=False)
         nptest.assert_array_almost_equal(R @ a, b)
 
-    def test_as_affine_returns_4x4_with_corner_one(self):
+    def test_as_affine_returns_4x4_with_corner_one(self) -> None:
         a = np.array([1.0, 0.0, 0.0])
         b = np.array([0.0, 0.0, 1.0])
         R = get_rotation_between_vectors(a, b, as_affine=True)

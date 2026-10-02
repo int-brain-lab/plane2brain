@@ -240,7 +240,8 @@ def intersect_line_mesh_np(
 
 
 @nb.njit("float64(float64[:],float64[:])", cache=True)
-def get_angle(a, b):
+def get_angle(a: np.ndarray, b: np.ndarray) -> float:
+    """Return the angle between two vectors in radians, in [0, pi]."""
     # the angle between two vectors a and b
     # to address the performance warnings: ensure contiguous arrays
     a = np.ascontiguousarray(a)
@@ -259,7 +260,7 @@ def intersect_line_mesh_nb(
     line_point: np.ndarray,
     line_vector: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """see intersect_line_mesh_np"""
+    """Numba JIT version of intersect_line_mesh_np(), without `numba` and `exclude`."""
     N = edges.shape[0]
     vertices_to_check = np.zeros(N, dtype="bool")
 
@@ -460,6 +461,16 @@ def find_closest_points_on_surface(
     brain_surface_points: np.ndarray,
     n: np.ndarray,
 ) -> np.ndarray:
+    """Return, for each point, the surface point closest to the line through it.
+
+    Args:
+        points_eval: Points the lines go through, shape (N, 3).
+        brain_surface_points: Candidate surface points, shape (M, 3).
+        n: Direction of the lines, shape (3,).
+
+    Returns:
+        The closest surface point for each point, shape (N, 3).
+    """
     # TODO this needs heavy refactoring
     # rename into: find_closest_point_from_lines
     # as this is essentially a parallelization wrapper find_closest_point_from_line_nb
@@ -478,6 +489,16 @@ def get_rotation_between_vectors(
     b: np.ndarray,
     as_affine: bool = True,
 ) -> np.ndarray:
+    """Return the rotation that maps the unit vector `a` onto the unit vector `b`.
+
+    Args:
+        a: Unit vector, shape (3,).
+        b: Unit vector, shape (3,), not parallel to `a`.
+        as_affine: If True, return the rotation as an affine matrix.
+
+    Returns:
+        The rotation matrix, shape (4, 4) if `as_affine`, else (3, 3).
+    """
     # returns the (3,3) transform or (4,4)
     # https://math.stackexchange.com/a/2470436
 

@@ -1,6 +1,4 @@
-"""
-some helper functions for affine transformations in 2d and 3d
-"""
+"""Helpers for affine transformations in homogeneous coordinates (4 × 4 matrices)."""
 
 import numpy as np
 
@@ -10,6 +8,7 @@ def translation_matrix(
     ty: float,
     tz: float,
 ) -> np.ndarray:
+    """Return the affine matrix of a translation, shape `(4, 4)`."""
     matrix = [
         [1, 0, 0, tx],
         [0, 1, 0, ty],
@@ -25,6 +24,7 @@ def scaling_matrix(
     sy: float,
     sz: float,
 ) -> np.ndarray:
+    """Return the affine matrix of a scaling along x, y and z, shape `(4, 4)`."""
     matrix = [
         [sx, 0, 0, 0],
         [0, sy, 0, 0],
@@ -38,6 +38,12 @@ def rotation_matrix_x(
     alpha: float,
     in_degrees: bool = False,
 ) -> np.ndarray:
+    """Return the affine matrix of a rotation about the x axis, shape `(4, 4)`.
+
+    Args:
+        alpha: Rotation angle, in radians unless `in_degrees`.
+        in_degrees: Whether `alpha` is in degrees.
+    """
     # pitch
     if in_degrees is True:
         alpha = np.deg2rad(alpha)
@@ -56,6 +62,12 @@ def rotation_matrix_y(
     beta: float,
     in_degrees: bool = False,
 ) -> np.ndarray:
+    """Return the affine matrix of a rotation about the y axis, shape `(4, 4)`.
+
+    Args:
+        beta: Rotation angle, in radians unless `in_degrees`.
+        in_degrees: Whether `beta` is in degrees.
+    """
     # roll
     if in_degrees is True:
         beta = np.deg2rad(beta)
@@ -74,6 +86,12 @@ def rotation_matrix_z(
     gamma: float,
     in_degrees: bool = False,
 ) -> np.ndarray:
+    """Return the affine matrix of a rotation about the z axis, shape `(4, 4)`.
+
+    Args:
+        gamma: Rotation angle, in radians unless `in_degrees`.
+        in_degrees: Whether `gamma` is in degrees.
+    """
     # yaw
     if in_degrees is True:
         gamma = np.deg2rad(gamma)
@@ -93,6 +111,10 @@ def rotation_matrix(
     beta: float,
     gamma: float,
 ) -> np.ndarray:
+    """Return the affine matrix of the rotations about x, y and z, shape `(4, 4)`.
+
+    The angles are in radians; the matrix is `Rx(alpha) @ Ry(beta) @ Rz(gamma)`.
+    """
     return rotation_matrix_x(alpha) @ rotation_matrix_y(beta) @ rotation_matrix_z(gamma)
 
 
@@ -100,6 +122,15 @@ def apply_transform(
     points: np.ndarray,
     transform: np.ndarray,
 ) -> np.ndarray:
+    """Apply an affine matrix to points.
+
+    Args:
+        points: Points, one per row, shape `(N, 3)`.
+        transform: Affine matrix, shape `(4, 4)`.
+
+    Returns:
+        The transformed points, shape `(N, 3)`.
+    """
     # points are of shape Nx3, hence transpose
     pt = points.T
     # adding homogeneous coordinate

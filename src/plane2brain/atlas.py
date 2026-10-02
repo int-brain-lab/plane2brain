@@ -1,7 +1,12 @@
+"""The brain atlas with a triangulated surface mesh for projections."""
+
+from typing import Any
+
 import numpy as np
 from iblatlas.atlas import AllenAtlas
 from scipy.spatial import ConvexHull
 
+from plane2brain.core import Plane
 from plane2brain.linalg import (
     intersect_line_mesh_np,
     intersect_line_mesh_precomputed_nb,
@@ -10,7 +15,20 @@ from plane2brain.linalg import (
 
 
 class ProjectionAtlas(AllenAtlas):
-    def __init__(self, *args, **kwargs):
+    """Allen atlas, scaled to the MRI Toronto atlas, with a triangulated brain surface.
+
+    The surface mesh (`mesh`: "vertices", "edges" and "normals" of the faces) is
+    used to cast rays onto the brain surface. Coordinates are in µm.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize the atlas and triangulate its brain surface.
+
+        Args:
+            *args: Passed on to `iblatlas.atlas.AllenAtlas`.
+            **kwargs: Passed on to `iblatlas.atlas.AllenAtlas`; `scaling` is
+                overwritten with the scaling to the MRI Toronto atlas.
+        """
         # FIXME TODO figure out how to properly subclass MRIToronto
         # Scaling factors to align the MRI Toronto atlas to Allen CCF space,
         # derived empirically from the MRI->CCF affine transform.
@@ -50,7 +68,8 @@ class ProjectionAtlas(AllenAtlas):
             dropna: If True, drop rows where the DV surface value is NaN.
 
         Returns:
-            Array of shape (N, 3) in (ml, ap, dv) order, in µm.
+            Array of shape (N, 3) in (ml, ap, dv) order, in µm. Also stored in
+            `self.surface_points`.
         """
 
         ap_grid, ml_grid = np.meshgrid(
@@ -73,8 +92,8 @@ class ProjectionAtlas(AllenAtlas):
         ap: float,
         upwards: bool = True,
         numba: bool = True,
-    ) -> tuple[np.ndarray, np.ndarray]:
-        """Return the brain surface plane in normal form at a given ML/AP location.
+    ) -> Plane:
+        """Return the brain surface tangent plane at a given ML/AP location.
 
         Casts a vertical ray downward from above the brain and finds its intersection
         with the surface mesh.
@@ -88,7 +107,8 @@ class ProjectionAtlas(AllenAtlas):
                 magnitude slower, it is kept as a reference implementation.
 
         Returns:
-            Tuple of (point on surface, surface normal), each of shape (3,) in µm.
+            The plane through the surface point, with the normal of the hit mesh
+            face, in µm.
         """
         # projects from a point above the brain downwards until it intersects
         # the mesh
@@ -113,7 +133,7 @@ class ProjectionAtlas(AllenAtlas):
         p = ips[ix]  # the intersection point in the mesh triangle
         if upwards and n[2] < 0:
             n *= -1
-        return p, n
+        return Plane(point=p, normal=n)
 
     def get_dv_for_mlap(
         self,
@@ -125,7 +145,8 @@ class ProjectionAtlas(AllenAtlas):
             coords_mlap: Array of shape (N, 2) in µm.
 
         Returns:
-            Array of shape (N, 3) in µm, with DV filled from the surface mesh.
+            Array of shape (N, 3) in µm, with DV filled from the surface mesh. Rows
+            whose vertical line misses the mesh are NaN.
         """
         coords_mlapdv = np.zeros((coords_mlap.shape[0], 3))
         for i, _coords in enumerate(coords_mlap):
@@ -153,7 +174,7 @@ class ProjectionAtlas(AllenAtlas):
     def get_labels_for_mlapdv(
         self,
         coords_mlapdv: np.ndarray,
-    ) -> tuple[np.ndarray, list, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, list[int], np.ndarray, np.ndarray]:
         """Look up Allen Atlas region labels for a set of ML/AP/DV coordinates.
 
         Args:
