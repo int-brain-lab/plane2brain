@@ -1,0 +1,1483 @@
+{
+  "Artist": {
+    "RoiGroups": {
+      "imagingRoiGroup": {
+        "ver": 1,
+        "classname": "scanimage.mroi.RoiGroup",
+        "name": "SP065_8rois_new",
+        "UserData": [],
+        "roiUuid": "9A1B7D0F2A67F484",
+        "roiUuiduint64": 1.110460681e+19,
+        "rois": [
+          {
+            "ver": 1,
+            "classname": "scanimage.mroi.Roi",
+            "name": "ROI 4",
+            "UserData": [],
+            "roiUuid": "93A40570CE348E0F",
+            "roiUuiduint64": 1.06386342e+19,
+            "zs": 120,
+            "scanfields": {
+              "ver": 1,
+              "classname": "scanimage.mroi.scanfield.fields.RotatedRectangle",
+              "name": "",
+              "UserData": [],
+              "roiUuid": "78993F6A801EE88A",
+              "roiUuiduint64": 8.690046683e+18,
+              "centerXY": [
+                -6.833166667,
+                2.393666667
+              ],
+              "sizeXY": [
+                4.6665,
+                4.6665
+              ],
+              "rotationDegrees": 0,
+              "enable": 1,
+              "pixelResolutionXY": [
+                512,
+                512
+              ],
+              "pixelToRefTransform": [
+                [
+                  0.009114257813,
+                  0,
+                  -9.170973796
+                ],
+                [
+                  0,
+                  0.009114257813,
+                  0.05585953809
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ],
+              "affine": [
+                [
+                  4.6665,
+                  0,
+                  -9.166416667
+                ],
+                [
+                  0,
+                  4.6665,
+                  0.060416667
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ]
+            },
+            "discretePlaneMode": 0,
+            "powers": [],
+            "pzAdjust": [],
+            "Lzs": [],
+            "interlaceDecimation": [],
+            "interlaceOffset": [],
+            "enable": 1
+          },
+          {
+            "ver": 1,
+            "classname": "scanimage.mroi.Roi",
+            "name": "ROI 5",
+            "UserData": [],
+            "roiUuid": "B8F1CD16D14AC427",
+            "roiUuiduint64": 1.332665827e+19,
+            "zs": 120,
+            "scanfields": {
+              "ver": 1,
+              "classname": "scanimage.mroi.scanfield.fields.RotatedRectangle",
+              "name": "",
+              "UserData": [],
+              "roiUuid": "155E471DD347C3D0",
+              "roiUuiduint64": 1.539746316e+18,
+              "centerXY": [
+                -6.833166667,
+                7.060166667
+              ],
+              "sizeXY": [
+                4.6665,
+                4.6665
+              ],
+              "rotationDegrees": 0,
+              "enable": 1,
+              "pixelResolutionXY": [
+                512,
+                512
+              ],
+              "pixelToRefTransform": [
+                [
+                  0.009114257813,
+                  0,
+                  -9.170973796
+                ],
+                [
+                  0,
+                  0.009114257813,
+                  4.722359538
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ],
+              "affine": [
+                [
+                  4.6665,
+                  0,
+                  -9.166416667
+                ],
+                [
+                  0,
+                  4.6665,
+                  4.726916667
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ]
+            },
+            "discretePlaneMode": 0,
+            "powers": [],
+            "pzAdjust": [],
+            "Lzs": [],
+            "interlaceDecimation": [],
+            "interlaceOffset": [],
+            "enable": 1
+          },
+          {
+            "ver": 1,
+            "classname": "scanimage.mroi.Roi",
+            "name": "ROI 6",
+            "UserData": [],
+            "roiUuid": "6AB35EB486E1559D",
+            "roiUuiduint64": 7.688593118e+18,
+            "zs": 120,
+            "scanfields": {
+              "ver": 1,
+              "classname": "scanimage.mroi.scanfield.fields.RotatedRectangle",
+              "name": "",
+              "UserData": [],
+              "roiUuid": "32B7E33C5F563EA6",
+              "roiUuiduint64": 3.654639471e+18,
+              "centerXY": [
+                -2.167,
+                2.393666667
+              ],
+              "sizeXY": [
+                4.6665,
+                4.6665
+              ],
+              "rotationDegrees": 0,
+              "enable": 1,
+              "pixelResolutionXY": [
+                512,
+                512
+              ],
+              "pixelToRefTransform": [
+                [
+                  0.009114257813,
+                  0,
+                  -4.504807129
+                ],
+                [
+                  0,
+                  0.009114257813,
+                  0.05585953809
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ],
+              "affine": [
+                [
+                  4.6665,
+                  0,
+                  -4.50025
+                ],
+                [
+                  0,
+                  4.6665,
+                  0.060416667
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ]
+            },
+            "discretePlaneMode": 0,
+            "powers": [],
+            "pzAdjust": [],
+            "Lzs": [],
+            "interlaceDecimation": [],
+            "interlaceOffset": [],
+            "enable": 1
+          },
+          {
+            "ver": 1,
+            "classname": "scanimage.mroi.Roi",
+            "name": "ROI 8",
+            "UserData": [],
+            "roiUuid": "8C4144736C3EF472",
+            "roiUuiduint64": 1.01064343e+19,
+            "zs": 120,
+            "scanfields": {
+              "ver": 1,
+              "classname": "scanimage.mroi.scanfield.fields.RotatedRectangle",
+              "name": "",
+              "UserData": [],
+              "roiUuid": "2D9A16AAAAA192C6",
+              "roiUuiduint64": 3.2859638e+18,
+              "centerXY": [
+                -2.167,
+                7.060166667
+              ],
+              "sizeXY": [
+                4.6665,
+                4.6665
+              ],
+              "rotationDegrees": 0,
+              "enable": 1,
+              "pixelResolutionXY": [
+                512,
+                512
+              ],
+              "pixelToRefTransform": [
+                [
+                  0.009114257813,
+                  0,
+                  -4.504807129
+                ],
+                [
+                  0,
+                  0.009114257813,
+                  4.722359538
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ],
+              "affine": [
+                [
+                  4.6665,
+                  0,
+                  -4.50025
+                ],
+                [
+                  0,
+                  4.6665,
+                  4.726916667
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ]
+            },
+            "discretePlaneMode": 0,
+            "powers": [],
+            "pzAdjust": [],
+            "Lzs": [],
+            "interlaceDecimation": [],
+            "interlaceOffset": [],
+            "enable": 1
+          },
+          {
+            "ver": 1,
+            "classname": "scanimage.mroi.Roi",
+            "name": "ROI 3",
+            "UserData": [],
+            "roiUuid": "5E71509430C03C0F",
+            "roiUuiduint64": 6.805309109e+18,
+            "zs": 120,
+            "scanfields": {
+              "ver": 1,
+              "classname": "scanimage.mroi.scanfield.fields.RotatedRectangle",
+              "name": "",
+              "UserData": [],
+              "roiUuid": "1EE067177B65CC3C",
+              "roiUuiduint64": 2.224891566e+18,
+              "centerXY": [
+                1.904166667,
+                -6.939333333
+              ],
+              "sizeXY": [
+                4.6665,
+                4.6665
+              ],
+              "rotationDegrees": 0,
+              "enable": 1,
+              "pixelResolutionXY": [
+                512,
+                512
+              ],
+              "pixelToRefTransform": [
+                [
+                  0.009114257813,
+                  0,
+                  -0.4336404619
+                ],
+                [
+                  0,
+                  0.009114257813,
+                  -9.277140462
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ],
+              "affine": [
+                [
+                  4.6665,
+                  0,
+                  -0.429083333
+                ],
+                [
+                  0,
+                  4.6665,
+                  -9.272583333
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ]
+            },
+            "discretePlaneMode": 0,
+            "powers": [],
+            "pzAdjust": [],
+            "Lzs": [],
+            "interlaceDecimation": [],
+            "interlaceOffset": [],
+            "enable": 1
+          },
+          {
+            "ver": 1,
+            "classname": "scanimage.mroi.Roi",
+            "name": "ROI 7",
+            "UserData": [],
+            "roiUuid": "D30A52B143E97320",
+            "roiUuiduint64": 1.520705801e+19,
+            "zs": 120,
+            "scanfields": {
+              "ver": 1,
+              "classname": "scanimage.mroi.scanfield.fields.RotatedRectangle",
+              "name": "",
+              "UserData": [],
+              "roiUuid": "9827BB3342BF11F5",
+              "roiUuiduint64": 1.096393765e+19,
+              "centerXY": [
+                2.4995,
+                2.393666667
+              ],
+              "sizeXY": [
+                4.6665,
+                4.6665
+              ],
+              "rotationDegrees": 0,
+              "enable": 1,
+              "pixelResolutionXY": [
+                512,
+                512
+              ],
+              "pixelToRefTransform": [
+                [
+                  0.009114257813,
+                  0,
+                  0.1616928711
+                ],
+                [
+                  0,
+                  0.009114257813,
+                  0.05585953809
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ],
+              "affine": [
+                [
+                  4.6665,
+                  0,
+                  0.16625
+                ],
+                [
+                  0,
+                  4.6665,
+                  0.060416667
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ]
+            },
+            "discretePlaneMode": 0,
+            "powers": [],
+            "pzAdjust": [],
+            "Lzs": [],
+            "interlaceDecimation": [],
+            "interlaceOffset": [],
+            "enable": 1
+          },
+          {
+            "ver": 1,
+            "classname": "scanimage.mroi.Roi",
+            "name": "ROI 9",
+            "UserData": [],
+            "roiUuid": "788E7DF89938D8DF",
+            "roiUuiduint64": 8.687019238e+18,
+            "zs": 120,
+            "scanfields": {
+              "ver": 1,
+              "classname": "scanimage.mroi.scanfield.fields.RotatedRectangle",
+              "name": "",
+              "UserData": [],
+              "roiUuid": "D1EA4A176859BB51",
+              "roiUuiduint64": 1.512598376e+19,
+              "centerXY": [
+                2.499833333,
+                7.060166667
+              ],
+              "sizeXY": [
+                4.6665,
+                4.6665
+              ],
+              "rotationDegrees": 0,
+              "enable": 1,
+              "pixelResolutionXY": [
+                512,
+                512
+              ],
+              "pixelToRefTransform": [
+                [
+                  0.009114257813,
+                  0,
+                  0.1620262041
+                ],
+                [
+                  0,
+                  0.009114257813,
+                  4.722359538
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ],
+              "affine": [
+                [
+                  4.6665,
+                  0,
+                  0.166583333
+                ],
+                [
+                  0,
+                  4.6665,
+                  4.726916667
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ]
+            },
+            "discretePlaneMode": 0,
+            "powers": [],
+            "pzAdjust": [],
+            "Lzs": [],
+            "interlaceDecimation": [],
+            "interlaceOffset": [],
+            "enable": 1
+          },
+          {
+            "ver": 1,
+            "classname": "scanimage.mroi.Roi",
+            "name": "ROI 1",
+            "UserData": [],
+            "roiUuid": "174031E36C676916",
+            "roiUuiduint64": 1.675393914e+18,
+            "zs": 120,
+            "scanfields": {
+              "ver": 1,
+              "classname": "scanimage.mroi.scanfield.fields.RotatedRectangle",
+              "name": "",
+              "UserData": [],
+              "roiUuid": "A340E748F1914098",
+              "roiUuiduint64": 1.176365653e+19,
+              "centerXY": [
+                7.166,
+                1.202666667
+              ],
+              "sizeXY": [
+                4.6665,
+                4.6665
+              ],
+              "rotationDegrees": 0,
+              "enable": 1,
+              "pixelResolutionXY": [
+                512,
+                512
+              ],
+              "pixelToRefTransform": [
+                [
+                  0.009114257813,
+                  0,
+                  4.828192871
+                ],
+                [
+                  0,
+                  0.009114257813,
+                  -1.135140462
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ],
+              "affine": [
+                [
+                  4.6665,
+                  0,
+                  4.83275
+                ],
+                [
+                  0,
+                  4.6665,
+                  -1.130583333
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ]
+            },
+            "discretePlaneMode": 0,
+            "powers": [],
+            "pzAdjust": [],
+            "Lzs": [],
+            "interlaceDecimation": [],
+            "interlaceOffset": [],
+            "enable": 1
+          },
+          {
+            "ver": 1,
+            "classname": "scanimage.mroi.Roi",
+            "name": "ROI 3",
+            "UserData": [],
+            "roiUuid": "395AAFFE4139ED7E",
+            "roiUuiduint64": 4.132809115e+18,
+            "zs": 120,
+            "scanfields": {
+              "ver": 1,
+              "classname": "scanimage.mroi.scanfield.fields.RotatedRectangle",
+              "name": "",
+              "UserData": [],
+              "roiUuid": "4B6F89EA7E66F5",
+              "roiUuiduint64": 2.123326139e+16,
+              "centerXY": [
+                -7.428833333,
+                -6.939333333
+              ],
+              "sizeXY": [
+                4.6665,
+                4.6665
+              ],
+              "rotationDegrees": 0,
+              "enable": 1,
+              "pixelResolutionXY": [
+                512,
+                512
+              ],
+              "pixelToRefTransform": [
+                [
+                  0.009114257813,
+                  0,
+                  -9.766640462
+                ],
+                [
+                  0,
+                  0.009114257813,
+                  -9.277140462
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ],
+              "affine": [
+                [
+                  4.6665,
+                  0,
+                  -9.762083333
+                ],
+                [
+                  0,
+                  4.6665,
+                  -9.272583333
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ]
+            },
+            "discretePlaneMode": 0,
+            "powers": [],
+            "pzAdjust": [],
+            "Lzs": [],
+            "interlaceDecimation": [],
+            "interlaceOffset": [],
+            "enable": 0
+          },
+          {
+            "ver": 1,
+            "classname": "scanimage.mroi.Roi",
+            "name": "ROI 3",
+            "UserData": [],
+            "roiUuid": "2D061B100927BF1A",
+            "roiUuiduint64": 3.244310337e+18,
+            "zs": 120,
+            "scanfields": {
+              "ver": 1,
+              "classname": "scanimage.mroi.scanfield.fields.RotatedRectangle",
+              "name": "",
+              "UserData": [],
+              "roiUuid": "44E1385CEADC5259",
+              "roiUuiduint64": 4.963310236e+18,
+              "centerXY": [
+                -7.428833333,
+                -2.272833333
+              ],
+              "sizeXY": [
+                4.6665,
+                4.6665
+              ],
+              "rotationDegrees": 0,
+              "enable": 1,
+              "pixelResolutionXY": [
+                512,
+                512
+              ],
+              "pixelToRefTransform": [
+                [
+                  0.009114257813,
+                  0,
+                  -9.766640462
+                ],
+                [
+                  0,
+                  0.009114257813,
+                  -4.610640462
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ],
+              "affine": [
+                [
+                  4.6665,
+                  0,
+                  -9.762083333
+                ],
+                [
+                  0,
+                  4.6665,
+                  -4.606083333
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ]
+            },
+            "discretePlaneMode": 0,
+            "powers": [],
+            "pzAdjust": [],
+            "Lzs": [],
+            "interlaceDecimation": [],
+            "interlaceOffset": [],
+            "enable": 0
+          },
+          {
+            "ver": 1,
+            "classname": "scanimage.mroi.Roi",
+            "name": "ROI 5",
+            "UserData": [],
+            "roiUuid": "A4FA33BE6CFC90BD",
+            "roiUuiduint64": 1.188787106e+19,
+            "zs": 120,
+            "scanfields": {
+              "ver": 1,
+              "classname": "scanimage.mroi.scanfield.fields.RotatedRectangle",
+              "name": "",
+              "UserData": [],
+              "roiUuid": "733C395F9B784564",
+              "roiUuiduint64": 8.303574896e+18,
+              "centerXY": [
+                -2.762333333,
+                -6.939333333
+              ],
+              "sizeXY": [
+                4.6665,
+                4.6665
+              ],
+              "rotationDegrees": 0,
+              "enable": 1,
+              "pixelResolutionXY": [
+                512,
+                512
+              ],
+              "pixelToRefTransform": [
+                [
+                  0.009114257813,
+                  0,
+                  -5.100140462
+                ],
+                [
+                  0,
+                  0.009114257813,
+                  -9.277140462
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ],
+              "affine": [
+                [
+                  4.6665,
+                  0,
+                  -5.095583333
+                ],
+                [
+                  0,
+                  4.6665,
+                  -9.272583333
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ]
+            },
+            "discretePlaneMode": 0,
+            "powers": [],
+            "pzAdjust": [],
+            "Lzs": [],
+            "interlaceDecimation": [],
+            "interlaceOffset": [],
+            "enable": 0
+          },
+          {
+            "ver": 1,
+            "classname": "scanimage.mroi.Roi",
+            "name": "ROI 5",
+            "UserData": [],
+            "roiUuid": "41A61DEBD53A0962",
+            "roiUuiduint64": 4.730501357e+18,
+            "zs": 120,
+            "scanfields": {
+              "ver": 1,
+              "classname": "scanimage.mroi.scanfield.fields.RotatedRectangle",
+              "name": "",
+              "UserData": [],
+              "roiUuid": "7ABE1A17A542E33F",
+              "roiUuiduint64": 8.844535407e+18,
+              "centerXY": [
+                -2.762333333,
+                -2.272833333
+              ],
+              "sizeXY": [
+                4.6665,
+                4.6665
+              ],
+              "rotationDegrees": 0,
+              "enable": 1,
+              "pixelResolutionXY": [
+                512,
+                512
+              ],
+              "pixelToRefTransform": [
+                [
+                  0.009114257813,
+                  0,
+                  -5.100140462
+                ],
+                [
+                  0,
+                  0.009114257813,
+                  -4.610640462
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ],
+              "affine": [
+                [
+                  4.6665,
+                  0,
+                  -5.095583333
+                ],
+                [
+                  0,
+                  4.6665,
+                  -4.606083333
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ]
+            },
+            "discretePlaneMode": 0,
+            "powers": [],
+            "pzAdjust": [],
+            "Lzs": [],
+            "interlaceDecimation": [],
+            "interlaceOffset": [],
+            "enable": 0
+          },
+          {
+            "ver": 1,
+            "classname": "scanimage.mroi.Roi",
+            "name": "ROI 4",
+            "UserData": [],
+            "roiUuid": "1B15987C37FB3119",
+            "roiUuiduint64": 1.951633673e+18,
+            "zs": 120,
+            "scanfields": {
+              "ver": 1,
+              "classname": "scanimage.mroi.scanfield.fields.RotatedRectangle",
+              "name": "",
+              "UserData": [],
+              "roiUuid": "F9058B6BEECF7DD8",
+              "roiUuiduint64": 1.794390159e+19,
+              "centerXY": [
+                1.904166667,
+                -2.272833333
+              ],
+              "sizeXY": [
+                4.6665,
+                4.6665
+              ],
+              "rotationDegrees": 0,
+              "enable": 1,
+              "pixelResolutionXY": [
+                512,
+                512
+              ],
+              "pixelToRefTransform": [
+                [
+                  0.009114257813,
+                  0,
+                  -0.4336404619
+                ],
+                [
+                  0,
+                  0.009114257813,
+                  -4.610640462
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ],
+              "affine": [
+                [
+                  4.6665,
+                  0,
+                  -0.429083333
+                ],
+                [
+                  0,
+                  4.6665,
+                  -4.606083333
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ]
+            },
+            "discretePlaneMode": 0,
+            "powers": [],
+            "pzAdjust": [],
+            "Lzs": [],
+            "interlaceDecimation": [],
+            "interlaceOffset": [],
+            "enable": 0
+          },
+          {
+            "ver": 1,
+            "classname": "scanimage.mroi.Roi",
+            "name": "ROI 2",
+            "UserData": [],
+            "roiUuid": "64B98E5C7C1F591B",
+            "roiUuiduint64": 7.257988802e+18,
+            "zs": 120,
+            "scanfields": {
+              "ver": 1,
+              "classname": "scanimage.mroi.scanfield.fields.RotatedRectangle",
+              "name": "",
+              "UserData": [],
+              "roiUuid": "3E272E64C1434E7D",
+              "roiUuiduint64": 4.478599365e+18,
+              "centerXY": [
+                7.166,
+                5.869166667
+              ],
+              "sizeXY": [
+                4.6665,
+                4.6665
+              ],
+              "rotationDegrees": 0,
+              "enable": 1,
+              "pixelResolutionXY": [
+                512,
+                512
+              ],
+              "pixelToRefTransform": [
+                [
+                  0.009114257813,
+                  0,
+                  4.828192871
+                ],
+                [
+                  0,
+                  0.009114257813,
+                  3.531359538
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ],
+              "affine": [
+                [
+                  4.6665,
+                  0,
+                  4.83275
+                ],
+                [
+                  0,
+                  4.6665,
+                  3.535916667
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ]
+            },
+            "discretePlaneMode": 0,
+            "powers": [],
+            "pzAdjust": [],
+            "Lzs": [],
+            "interlaceDecimation": [],
+            "interlaceOffset": [],
+            "enable": 0
+          },
+          {
+            "ver": 1,
+            "classname": "scanimage.mroi.Roi",
+            "name": "ROI 7",
+            "UserData": [],
+            "roiUuid": "5030A05713AED75",
+            "roiUuiduint64": 3.611434136e+17,
+            "zs": 120,
+            "scanfields": {
+              "ver": 1,
+              "classname": "scanimage.mroi.scanfield.fields.RotatedRectangle",
+              "name": "",
+              "UserData": [],
+              "roiUuid": "659420FDC4E4AE34",
+              "roiUuiduint64": 7.319511569e+18,
+              "centerXY": [
+                -9.469333333,
+                4.101166667
+              ],
+              "sizeXY": [
+                4.6665,
+                4.6665
+              ],
+              "rotationDegrees": 0,
+              "enable": 1,
+              "pixelResolutionXY": [
+                512,
+                512
+              ],
+              "pixelToRefTransform": [
+                [
+                  0.009114257813,
+                  0,
+                  -11.80714046
+                ],
+                [
+                  0,
+                  0.009114257813,
+                  1.763359538
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ],
+              "affine": [
+                [
+                  4.6665,
+                  0,
+                  -11.80258333
+                ],
+                [
+                  0,
+                  4.6665,
+                  1.767916667
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ]
+            },
+            "discretePlaneMode": 0,
+            "powers": [],
+            "pzAdjust": [],
+            "Lzs": [],
+            "interlaceDecimation": [],
+            "interlaceOffset": [],
+            "enable": 0
+          },
+          {
+            "ver": 1,
+            "classname": "scanimage.mroi.Roi",
+            "name": "ROI 8",
+            "UserData": [],
+            "roiUuid": "704B099FABD7FB56",
+            "roiUuiduint64": 8.091571737e+18,
+            "zs": 120,
+            "scanfields": {
+              "ver": 1,
+              "classname": "scanimage.mroi.scanfield.fields.RotatedRectangle",
+              "name": "",
+              "UserData": [],
+              "roiUuid": "332A35C0279DD995",
+              "roiUuiduint64": 3.686818344e+18,
+              "centerXY": [
+                -10.60733333,
+                -0.5653333333
+              ],
+              "sizeXY": [
+                4.6665,
+                4.6665
+              ],
+              "rotationDegrees": 0,
+              "enable": 1,
+              "pixelResolutionXY": [
+                512,
+                512
+              ],
+              "pixelToRefTransform": [
+                [
+                  0.009114257813,
+                  0,
+                  -12.94514046
+                ],
+                [
+                  0,
+                  0.009114257813,
+                  -2.903140462
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ],
+              "affine": [
+                [
+                  4.6665,
+                  0,
+                  -12.94058333
+                ],
+                [
+                  0,
+                  4.6665,
+                  -2.898583333
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ]
+            },
+            "discretePlaneMode": 0,
+            "powers": [],
+            "pzAdjust": [],
+            "Lzs": [],
+            "interlaceDecimation": [],
+            "interlaceOffset": [],
+            "enable": 0
+          },
+          {
+            "ver": 1,
+            "classname": "scanimage.mroi.Roi",
+            "name": "ROI 4",
+            "UserData": [],
+            "roiUuid": "22E411891C98BF66",
+            "roiUuiduint64": 2.514153773e+18,
+            "zs": 120,
+            "scanfields": {
+              "ver": 1,
+              "classname": "scanimage.mroi.scanfield.fields.RotatedRectangle",
+              "name": "",
+              "UserData": [],
+              "roiUuid": "B258C81AEDFAD8C0",
+              "roiUuiduint64": 1.285124155e+19,
+              "centerXY": [
+                -2.166666667,
+                3.5655
+              ],
+              "sizeXY": [
+                4.6665,
+                4.6665
+              ],
+              "rotationDegrees": 0,
+              "enable": 1,
+              "pixelResolutionXY": [
+                512,
+                512
+              ],
+              "pixelToRefTransform": [
+                [
+                  0.009114257813,
+                  0,
+                  -4.504473796
+                ],
+                [
+                  0,
+                  0.009114257813,
+                  1.227692871
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ],
+              "affine": [
+                [
+                  4.6665,
+                  0,
+                  -4.499916667
+                ],
+                [
+                  0,
+                  4.6665,
+                  1.23225
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ]
+            },
+            "discretePlaneMode": 0,
+            "powers": [],
+            "pzAdjust": [],
+            "Lzs": [],
+            "interlaceDecimation": [],
+            "interlaceOffset": [],
+            "enable": 0
+          },
+          {
+            "ver": 1,
+            "classname": "scanimage.mroi.Roi",
+            "name": "ROI 2",
+            "UserData": [],
+            "roiUuid": "87160A81FD6D606E",
+            "roiUuiduint64": 9.733979198e+18,
+            "zs": 120,
+            "scanfields": {
+              "ver": 1,
+              "classname": "scanimage.mroi.scanfield.fields.RotatedRectangle",
+              "name": "",
+              "UserData": [],
+              "roiUuid": "3F29FE7096033F13",
+              "roiUuiduint64": 4.551448658e+18,
+              "centerXY": [
+                -2.166666667,
+                8.232
+              ],
+              "sizeXY": [
+                4.6665,
+                4.6665
+              ],
+              "rotationDegrees": 0,
+              "enable": 1,
+              "pixelResolutionXY": [
+                512,
+                512
+              ],
+              "pixelToRefTransform": [
+                [
+                  0.009114257813,
+                  0,
+                  -4.504473796
+                ],
+                [
+                  0,
+                  0.009114257813,
+                  5.894192871
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ],
+              "affine": [
+                [
+                  4.6665,
+                  0,
+                  -4.499916667
+                ],
+                [
+                  0,
+                  4.6665,
+                  5.89875
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ]
+            },
+            "discretePlaneMode": 0,
+            "powers": [],
+            "pzAdjust": [],
+            "Lzs": [],
+            "interlaceDecimation": [],
+            "interlaceOffset": [],
+            "enable": 0
+          },
+          {
+            "ver": 1,
+            "classname": "scanimage.mroi.Roi",
+            "name": "ROI 5",
+            "UserData": [],
+            "roiUuid": "94D9AD52C4DF1713",
+            "roiUuiduint64": 1.072579456e+19,
+            "zs": 120,
+            "scanfields": {
+              "ver": 1,
+              "classname": "scanimage.mroi.scanfield.fields.RotatedRectangle",
+              "name": "",
+              "UserData": [],
+              "roiUuid": "A140099B8D62F722",
+              "roiUuiduint64": 1.16192976e+19,
+              "centerXY": [
+                2.4995,
+                3.5655
+              ],
+              "sizeXY": [
+                4.6665,
+                4.6665
+              ],
+              "rotationDegrees": 0,
+              "enable": 1,
+              "pixelResolutionXY": [
+                512,
+                512
+              ],
+              "pixelToRefTransform": [
+                [
+                  0.009114257813,
+                  0,
+                  0.1616928711
+                ],
+                [
+                  0,
+                  0.009114257813,
+                  1.227692871
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ],
+              "affine": [
+                [
+                  4.6665,
+                  0,
+                  0.16625
+                ],
+                [
+                  0,
+                  4.6665,
+                  1.23225
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ]
+            },
+            "discretePlaneMode": 0,
+            "powers": [],
+            "pzAdjust": [],
+            "Lzs": [],
+            "interlaceDecimation": [],
+            "interlaceOffset": [],
+            "enable": 0
+          },
+          {
+            "ver": 1,
+            "classname": "scanimage.mroi.Roi",
+            "name": "ROI 3",
+            "UserData": [],
+            "roiUuid": "2582004E349B4418",
+            "roiUuiduint64": 2.702723062e+18,
+            "zs": 120,
+            "scanfields": {
+              "ver": 1,
+              "classname": "scanimage.mroi.scanfield.fields.RotatedRectangle",
+              "name": "",
+              "UserData": [],
+              "roiUuid": "1FBA069871F78620",
+              "roiUuiduint64": 2.286147013e+18,
+              "centerXY": [
+                6.570666667,
+                -6.939333333
+              ],
+              "sizeXY": [
+                4.6665,
+                4.6665
+              ],
+              "rotationDegrees": 0,
+              "enable": 1,
+              "pixelResolutionXY": [
+                512,
+                512
+              ],
+              "pixelToRefTransform": [
+                [
+                  0.009114257813,
+                  0,
+                  4.232859538
+                ],
+                [
+                  0,
+                  0.009114257813,
+                  -9.277140462
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ],
+              "affine": [
+                [
+                  4.6665,
+                  0,
+                  4.237416667
+                ],
+                [
+                  0,
+                  4.6665,
+                  -9.272583333
+                ],
+                [
+                  0,
+                  0,
+                  1
+                ]
+              ]
+            },
+            "discretePlaneMode": 0,
+            "powers": [],
+            "pzAdjust": [],
+            "Lzs": [],
+            "interlaceDecimation": [],
+            "interlaceOffset": [],
+            "enable": 0
+          }
+        ]
+      },
+      "photostimRoiGroups": [],
+      "integrationRoiGroup": {
+        "ver": 1,
+        "classname": "scanimage.mroi.RoiGroup",
+        "name": "",
+        "UserData": [],
+        "roiUuid": "D7393EFF41EC0F9A",
+        "roiUuiduint64": 1.550849606e+19,
+        "rois": {
+          "x_ArrayType_": "double",
+          "x_ArraySize_": [
+            1,
+            0
+          ],
+          "x_ArrayData_": []
+        }
+      }
+    }
+  },
+  "ImageDescription": "frameNumbers = 1\nacquisitionNumbers = 1\nframeNumberAcquisition = 1\nframeTimestamps_sec = 0.000000000\nacqTriggerTimestamps_sec = -0.000074815\nnextFileMarkerTimestamps_sec = -1.000000000\nendOfAcquisition = 0\nendOfAcquisitionMode = 0\ndcOverVoltage = 0\nepoch = [2025  2 21 12  6 56.065]\nauxTrigger0 = []\nauxTrigger1 = []\nauxTrigger2 = []\nauxTrigger3 = []\nI2CData = {}\n                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    ",
+  "Software": "SI.LINE_FORMAT_VERSION = 1\nSI.PREMIUM = true\nSI.TIFF_FORMAT_VERSION = 4\nSI.VERSION_COMMIT = 'b0e89ff7717e60826b56173afe65ddb1ea6efb87'\nSI.VERSION_MAJOR = 2023\nSI.VERSION_MINOR = 1\nSI.VERSION_UPDATE = 0\nSI.acqState = 'grab'\nSI.acqsPerLoop = 1\nSI.errorMsg = ''\nSI.extTrigEnable = 1\nSI.fieldCurvatureRxs = [3750 3750]\nSI.fieldCurvatureRys = [3750 3750]\nSI.fieldCurvatureTilt = 0\nSI.fieldCurvatureTip = 0\nSI.fieldCurvatureZs = [0 360]\nSI.hBeams.enablePowerBox = false\nSI.hBeams.errorMsg = ''\nSI.hBeams.flybackBlanking = true\nSI.hBeams.interlaceDecimation = [1 1 1 1]\nSI.hBeams.interlaceOffset = [0 0 0 0]\nSI.hBeams.lengthConstants = [600 Inf Inf Inf]\nSI.hBeams.name = 'SI Beams'\nSI.hBeams.powerBoxEndFrame = Inf\nSI.hBeams.powerBoxStartFrame = 1\nSI.hBeams.powerFractionLimits = [1 1 1 1]\nSI.hBeams.powerFractions = [1 0 0.34 0]\nSI.hBeams.powers = [100 0 34 0]\nSI.hBeams.pzAdjust = [scanimage.types.BeamAdjustTypes.Exponential scanimage.types.BeamAdjustTypes.Exponential scanimage.types.BeamAdjustTypes.Exponential scanimage.types.BeamAdjustTypes.Exponential]\nSI.hBeams.pzFunction = {'@scanimage.util.defaultPowerFunction' '@scanimage.util.defaultPowerFunction' '@scanimage.util.defaultPowerFunction' '@scanimage.util.defaultPowerFunction'}\nSI.hBeams.pzLUTSource = {'' '' '' ''}\nSI.hBeams.reserverInfo = ''\nSI.hBeams.totalNumBeams = 4\nSI.hBeams.turnAroundBlanking = true\nSI.hBeams.userInfo = ''\nSI.hBeams.warnMsg = ''\nSI.hCameraManager.errorMsg = ''\nSI.hCameraManager.name = 'SI CameraManager'\nSI.hCameraManager.reserverInfo = ''\nSI.hCameraManager.userInfo = ''\nSI.hCameraManager.warnMsg = ''\nSI.hChannels.channelAdcResolution = {16 16 16 16 16 16 16 16}\nSI.hChannels.channelDisplay = [1 2]\nSI.hChannels.channelInputRange = {[-0.5 0.5] [-0.5 0.5] [-1 1] [-1 1]}\nSI.hChannels.channelLUT = {[-1180 3768] [0 7539] [0 100] [0 100] [0 100] [0 100] [0 100] [0 100]}\nSI.hChannels.channelMergeColor = {'green' 'green' 'red' 'red' 'red' 'red' 'red' 'red'}\nSI.hChannels.channelName = {'Channel 1' 'Channel 2' 'Channel 3' 'Channel 4' 'Channel 5' 'Channel 6' 'Channel 7' 'Channel 8'}\nSI.hChannels.channelOffset = [0 0 0 0]\nSI.hChannels.channelSave = [1 2]\nSI.hChannels.channelSubtractOffset = [true true true true]\nSI.hChannels.channelType = {'stripe' 'stripe' 'stripe' 'stripe' 'stripe' 'stripe' 'stripe' 'stripe'}\nSI.hChannels.channelsActive = [1 2]\nSI.hChannels.channelsAvailable = 4\nSI.hChannels.colorMap = 'Gray'\nSI.hChannels.errorMsg = ''\nSI.hChannels.loggingEnable = 1\nSI.hChannels.name = 'SI Channels'\nSI.hChannels.reserverInfo = ''\nSI.hChannels.userInfo = ''\nSI.hChannels.warnMsg = ''\nSI.hConfigurationSaver.cfgFilename = 'F:\\ScanImageAcquisitions\\SP065\\RoiGroups\\FullWindow_lorez.cfg'\nSI.hConfigurationSaver.errorMsg = ''\nSI.hConfigurationSaver.name = 'SI ConfigurationSaver'\nSI.hConfigurationSaver.reserverInfo = ''\nSI.hConfigurationSaver.userInfo = ''\nSI.hConfigurationSaver.usrFilename = 'C:\\SI_config\\samuel_SI2023.usr'\nSI.hConfigurationSaver.warnMsg = ''\nSI.hCoordinateSystems.errorMsg = ''\nSI.hCoordinateSystems.name = 'SI CoordinateSystems'\nSI.hCoordinateSystems.reserverInfo = ''\nSI.hCoordinateSystems.userInfo = ''\nSI.hCoordinateSystems.warnMsg = ''\nSI.hCycleManager.cycleIterIdxTotal = 0\nSI.hCycleManager.cyclesCompleted = 0\nSI.hCycleManager.enabled = false\nSI.hCycleManager.errorMsg = ''\nSI.hCycleManager.itersCompleted = 0\nSI.hCycleManager.name = 'SI CycleManager'\nSI.hCycleManager.reserverInfo = ''\nSI.hCycleManager.totalCycles = 1\nSI.hCycleManager.userInfo = ''\nSI.hCycleManager.warnMsg = ''\nSI.hDisplay.autoScaleSaturationFraction = [0.1 0.01]\nSI.hDisplay.channelsMergeEnable = false\nSI.hDisplay.channelsMergeFocusOnly = false\nSI.hDisplay.displayRollingAverageFactor = 1\nSI.hDisplay.displayRollingAverageFactorLock = 0\nSI.hDisplay.enableScanfieldDisplays = false\nSI.hDisplay.errorMsg = ''\nSI.hDisplay.lineScanHistoryLength = 1000\nSI.hDisplay.name = 'SI Display'\nSI.hDisplay.renderer = 'auto'\nSI.hDisplay.reserverInfo = ''\nSI.hDisplay.scanfieldDisplayColumns = 5\nSI.hDisplay.scanfieldDisplayRows = 5\nSI.hDisplay.scanfieldDisplayTilingMode = 'Auto'\nSI.hDisplay.scanfieldDisplays.enable = false\nSI.hDisplay.scanfieldDisplays.name = 'Display 1'\nSI.hDisplay.scanfieldDisplays.channel = 1\nSI.hDisplay.scanfieldDisplays.roi = 1\nSI.hDisplay.scanfieldDisplays.z = 0\nSI.hDisplay.selectedZs = []\nSI.hDisplay.showScanfieldDisplayNames = true\nSI.hDisplay.userInfo = ''\nSI.hDisplay.volumeDisplayStyle = 'Tiled'\nSI.hDisplay.warnMsg = ''\nSI.hFastZ.actuatorLag = 0\nSI.hFastZ.discardFlybackFrames = false\nSI.hFastZ.enable = true\nSI.hFastZ.enableFieldCurveCorr = 1\nSI.hFastZ.errorMsg = ''\nSI.hFastZ.flybackTime = 0\nSI.hFastZ.hasFastZ = true\nSI.hFastZ.name = 'SI FastZ'\nSI.hFastZ.numDiscardFlybackFrames = 0\nSI.hFastZ.position = 240\nSI.hFastZ.positionInterpolationAlgorithm = 'default'\nSI.hFastZ.reserverInfo = ''\nSI.hFastZ.userInfo = ''\nSI.hFastZ.volumePeriodAdjustment = -0.0005999999999999999\nSI.hFastZ.warnMsg = ''\nSI.hFastZ.waveformType = 'step'\nSI.hIntegrationRoiManager.enable = false\nSI.hIntegrationRoiManager.enableDisplay = true\nSI.hIntegrationRoiManager.errorMsg = ''\nSI.hIntegrationRoiManager.integrationHistoryLength = 1000\nSI.hIntegrationRoiManager.name = 'SI IntegrationRoiManager'\nSI.hIntegrationRoiManager.outputChannelsEnabled = []\nSI.hIntegrationRoiManager.outputChannelsFunctions = {}\nSI.hIntegrationRoiManager.outputChannelsNames = {}\nSI.hIntegrationRoiManager.outputChannelsPhysicalNames = {}\nSI.hIntegrationRoiManager.outputChannelsRoiNames = {}\nSI.hIntegrationRoiManager.postProcessFcn = '@scanimage.components.integrationRois.integrationPostProcessingFcn'\nSI.hIntegrationRoiManager.reserverInfo = ''\nSI.hIntegrationRoiManager.userInfo = ''\nSI.hIntegrationRoiManager.warnMsg = ''\nSI.hMotionManager.correctionBoundsXY = [-5 5]\nSI.hMotionManager.correctionBoundsZ = [-50 50]\nSI.hMotionManager.correctionDeviceXY = 'galvos'\nSI.hMotionManager.correctionDeviceZ = 'fastz'\nSI.hMotionManager.correctionEnableXY = false\nSI.hMotionManager.correctionEnableZ = false\nSI.hMotionManager.correctorClassName = 'scanimage.components.motionCorrectors.SimpleMotionCorrector'\nSI.hMotionManager.enable = false\nSI.hMotionManager.errorMsg = ''\nSI.hMotionManager.estimateOnNewAveragedFrames = false\nSI.hMotionManager.estimatorClassName = 'scanimage.components.motionEstimators.SimpleMotionEstimator'\nSI.hMotionManager.motionHistoryLength = 100\nSI.hMotionManager.motionMarkersXY = zeros(0,2)\nSI.hMotionManager.name = 'SI MotionManager'\nSI.hMotionManager.nextFrameToEstimate = 0\nSI.hMotionManager.reserverInfo = ''\nSI.hMotionManager.resetCorrectionAfterAcq = true\nSI.hMotionManager.useAveragedStripe = false\nSI.hMotionManager.userInfo = ''\nSI.hMotionManager.warnMsg = ''\nSI.hMotionManager.zStackAlignmentFcn = '@scanimage.components.motionEstimators.util.alignZRoiData'\nSI.hMotors.axesPosition = [0 0 0]\nSI.hMotors.azimuth = 0\nSI.hMotors.elevation = 0\nSI.hMotors.errorMsg = ''\nSI.hMotors.errorTf = true\nSI.hMotors.isAligned = false\nSI.hMotors.isHomed = true\nSI.hMotors.isRelativeZeroSet = false\nSI.hMotors.maxZStep = Inf\nSI.hMotors.minPositionQueryInterval_s = 0.001\nSI.hMotors.motorErrorMsg = {'XYZ Stage: initialization error: Error instantiating Motor'}\nSI.hMotors.moveInProgress = false\nSI.hMotors.moveTimeout_s = 10\nSI.hMotors.name = 'SI Motors'\nSI.hMotors.reserverInfo = ''\nSI.hMotors.samplePosition = [0 0 0]\nSI.hMotors.simulatedAxes = [false false false]\nSI.hMotors.userDefinedPositions = []\nSI.hMotors.userInfo = ''\nSI.hMotors.warnMsg = ''\nSI.hPhotostim.allowMultipleOutputs = false\nSI.hPhotostim.autoTriggerPeriod = 0\nSI.hPhotostim.compensateMotionEnabled = true\nSI.hPhotostim.completedSequences = 0\nSI.hPhotostim.errorMsg = ''\nSI.hPhotostim.laserActiveSignalAdvance = 0.001\nSI.hPhotostim.lastMotion = [0 0]\nSI.hPhotostim.logging = false\nSI.hPhotostim.monitoring = false\nSI.hPhotostim.monitoringSampleRate = 9000\nSI.hPhotostim.name = 'SI Photostim'\nSI.hPhotostim.nextStimulus = 1\nSI.hPhotostim.numOutputs = 0\nSI.hPhotostim.numSequences = Inf\nSI.hPhotostim.pairBeamActiveOutputChannel = 1\nSI.hPhotostim.pairStimActiveOutputChannel = 0\nSI.hPhotostim.primedStimulus = []\nSI.hPhotostim.reserverInfo = ''\nSI.hPhotostim.sequencePosition = 1\nSI.hPhotostim.sequenceSelectedStimuli = []\nSI.hPhotostim.status = 'Offline'\nSI.hPhotostim.stimImmediately = false\nSI.hPhotostim.stimSelectionAssignment = []\nSI.hPhotostim.stimSelectionDevice = ''\nSI.hPhotostim.stimSelectionTerms = []\nSI.hPhotostim.stimSelectionTriggerTerm = []\nSI.hPhotostim.stimTriggerTerm = ''\nSI.hPhotostim.stimulusMode = 'onDemand'\nSI.hPhotostim.syncTriggerTerm = ''\nSI.hPhotostim.userInfo = ''\nSI.hPhotostim.warnMsg = ''\nSI.hPhotostim.zMode = '2D'\nSI.hPmts.autoPower = zeros(1,0)\nSI.hPmts.autoPowerOnWaitTime_s = 0.3\nSI.hPmts.bandwidths = zeros(1,0)\nSI.hPmts.errorMsg = ''\nSI.hPmts.gains = zeros(1,0)\nSI.hPmts.name = 'SI Pmts'\nSI.hPmts.names = {}\nSI.hPmts.offsets = zeros(1,0)\nSI.hPmts.powersOn = zeros(1,0)\nSI.hPmts.reserverInfo = ''\nSI.hPmts.tripped = zeros(1,0)\nSI.hPmts.userInfo = ''\nSI.hPmts.warnMsg = ''\nSI.hRoiManager.errorMsg = ''\nSI.hRoiManager.forceSquarePixelation = true\nSI.hRoiManager.forceSquarePixels = true\nSI.hRoiManager.imagingFovDeg = []\nSI.hRoiManager.imagingFovUm = []\nSI.hRoiManager.linePeriod = 4.164931278633903e-05\nSI.hRoiManager.linesPerFrame = 512\nSI.hRoiManager.mroiEnable = 1\nSI.hRoiManager.name = 'SI RoiManager'\nSI.hRoiManager.pixelsPerLine = 512\nSI.hRoiManager.reserverInfo = ''\nSI.hRoiManager.scanAngleMultiplierFast = 1\nSI.hRoiManager.scanAngleMultiplierSlow = 1\nSI.hRoiManager.scanAngleShiftFast = 0\nSI.hRoiManager.scanAngleShiftSlow = 0\nSI.hRoiManager.scanFramePeriod = 0.200249895876718\nSI.hRoiManager.scanFrameRate = 4.993760399334443\nSI.hRoiManager.scanRotation = 0\nSI.hRoiManager.scanType = 'frame'\nSI.hRoiManager.scanVolumeRate = 4.993760399334443\nSI.hRoiManager.scanZoomFactor = 1\nSI.hRoiManager.userInfo = ''\nSI.hRoiManager.warnMsg = ''\nSI.hScan2D.acquisitionEngineIdx = 1\nSI.hScan2D.beamClockDelay = 1.5e-06\nSI.hScan2D.beamClockExtend = 0\nSI.hScan2D.bidirectional = true\nSI.hScan2D.channelOffsets = [0 0 0 0]\nSI.hScan2D.channels = {}\nSI.hScan2D.channelsAdcResolution = 16\nSI.hScan2D.channelsAutoReadOffsets = 0\nSI.hScan2D.channelsAvailable = 4\nSI.hScan2D.channelsDataType = 'int16'\nSI.hScan2D.channelsFilter = '40 MHz'\nSI.hScan2D.channelsInputRanges = {[-0.5 0.5] [-0.5 0.5] [-1 1] [-1 1]}\nSI.hScan2D.channelsSubtractOffsets = [true true true true]\nSI.hScan2D.customFilterClockPeriod = 1\nSI.hScan2D.desiredSampleRateCtl = 200000\nSI.hScan2D.errorMsg = ''\nSI.hScan2D.fillFractionSpatial = 0.9000000000000001\nSI.hScan2D.fillFractionTemporal = 0.7128674137425877\nSI.hScan2D.flybackTimePerFrame = 0.008\nSI.hScan2D.flytoTimePerScanfield = 0.003\nSI.hScan2D.fovCornerPoints = [-18.6925 -20.95;18.6925 -20.95;18.6925 20.95;-18.6925 20.95]\nSI.hScan2D.hasResonantMirror = true\nSI.hScan2D.hasXGalvo = true\nSI.hScan2D.isPolygonalScanning = false\nSI.hScan2D.isStreamScanning = false\nSI.hScan2D.keepResonantScannerOn = true\nSI.hScan2D.linePhase = -2.368e-06\nSI.hScan2D.linePhaseMode = 'Nearest Neighbor'\nSI.hScan2D.lineScanFdbkSamplesPerFrame = []\nSI.hScan2D.lineScanNumFdbkChannels = []\nSI.hScan2D.lineScanSamplesPerFrame = []\nSI.hScan2D.logAverageDisableDivide = false\nSI.hScan2D.logAverageFactor = 1\nSI.hScan2D.logFramesPerFile = 1000\nSI.hScan2D.logFramesPerFileLock = false\nSI.hScan2D.logOverwriteWarn = false\nSI.hScan2D.mask = [14;13;12;13;13;12;12;12;12;12;11;11;12;11;11;11;11;10;11;10;11;10;10;10;10;10;10;10;10;9;10;9;10;9;9;10;9;9;9;9;9;9;9;8;9;9;8;9;8;9;8;9;8;8;9;8;8;8;8;8;8;8;8;8;8;8;8;7;8;8;8;7;8;7;8;8;7;8;7;7;8;7;8;7;7;7;8;7;7;7;8;7;7;7;7;7;7;7;7;7;7;7;7;7;7;6;7;7;7;7;7;6;7;7;7;6;7;7;6;7;6;7;7;6;7;6;7;6;7;7;6;6;7;6;7;6;7;6;7;6;6;7;6;6;7;6;6;7;6;6;6;7;6;6;6;7;6;6;6;7;6;6;6;6;6;6;7;6;6;6;6;6;6;6;6;7;6;6;6;6;6;6;6;6;6;6;6;6;6;6;6;6;6;6;6;6;6;6;6;6;6;5;6;6;6;6;6;6;6;6;6;6;6;5;6;6;6;6;6;6;6;5;6;6;6;6;6;6;5;6;6;6;6;6;6;5;6;6;6;6;6;5;6;6;6;6;6;5;6;6;6;6;6;5;6;6;6;6;5;6;6;6;6;6;5;6;6;6;6;6;5;6;6;6;6;6;5;6;6;6;6;6;6;5;6;6;6;6;6;6;5;6;6;6;6;6;6;6;5;6;6;6;6;6;6;6;6;6;6;6;5;6;6;6;6;6;6;6;6;6;6;6;6;6;6;6;6;6;6;6;6;6;6;6;6;6;7;6;6;6;6;6;6;6;6;7;6;6;6;6;6;6;7;6;6;6;7;6;6;6;7;6;6;6;7;6;6;7;6;6;7;6;6;7;6;7;6;7;6;7;6;6;7;7;6;7;6;7;6;7;7;6;7;6;7;7;6;7;7;7;6;7;7;7;7;7;6;7;7;7;7;7;7;7;7;7;7;7;7;7;7;8;7;7;7;8;7;7;7;8;7;8;7;7;8;7;8;8;7;8;7;8;8;8;7;8;8;8;8;8;8;8;8;8;8;8;8;9;8;8;9;8;9;8;9;8;9;9;8;9;9;9;9;9;9;9;10;9;9;10;9;10;9;10;10;10;10;10;10;10;10;11;10;11;10;11;11;11;11;12;11;11;12;12;12;12;12;13;13;12;13;14]\nSI.hScan2D.maxSampleRate = 125000000\nSI.hScan2D.name = 'ImagingScanner'\nSI.hScan2D.nominalFovCornerPoints = [-18.6925 -20.95;18.6925 -20.95;18.6925 20.95;-18.6925 20.95]\nSI.hScan2D.parkSlmForAcquisition = true\nSI.hScan2D.photonDiscriminatorDifferentiateWidths = [4 4]\nSI.hScan2D.photonDiscriminatorModes = {'threshold crossing' 'threshold crossing'}\nSI.hScan2D.photonDiscriminatorThresholds = [500 500]\nSI.hScan2D.physicalChannelsAvailable = 4\nSI.hScan2D.pixelBinFactor = 1\nSI.hScan2D.recordScannerFeedback = false\nSI.hScan2D.reserverInfo = ''\nSI.hScan2D.sampleRate = 125000000\nSI.hScan2D.sampleRateCtl = 200000\nSI.hScan2D.sampleRateFdbk = 200000\nSI.hScan2D.scanMode = 'resonant'\nSI.hScan2D.scanPixelTimeMaxMinRatio = 2.8\nSI.hScan2D.scanPixelTimeMean = 5.8e-08\nSI.hScan2D.scannerFrequency = 12005\nSI.hScan2D.scannerToRefTransform = [1 0 0;0 1 0;0 0 1]\nSI.hScan2D.scannerType = 'RGG'\nSI.hScan2D.settleTimeFraction = 0\nSI.hScan2D.simulated = false\nSI.hScan2D.stripingEnable = false\nSI.hScan2D.stripingPeriod = 0.1\nSI.hScan2D.trigAcqEdge = 'rising'\nSI.hScan2D.trigAcqInTerm = 'D2.1'\nSI.hScan2D.trigNextEdge = 'rising'\nSI.hScan2D.trigNextInTerm = ''\nSI.hScan2D.trigNextStopEnable = true\nSI.hScan2D.trigStopEdge = 'rising'\nSI.hScan2D.trigStopInTerm = 'D2.4'\nSI.hScan2D.uniformSampling = false\nSI.hScan2D.useCustomFilterClock = false\nSI.hScan2D.userInfo = ''\nSI.hScan2D.virtualChannelSettings__1.source = 'AI0'\nSI.hScan2D.virtualChannelSettings__1.mode = 'analog'\nSI.hScan2D.virtualChannelSettings__1.threshold = false\nSI.hScan2D.virtualChannelSettings__1.binarize = false\nSI.hScan2D.virtualChannelSettings__1.edgeDetect = false\nSI.hScan2D.virtualChannelSettings__1.laserGate = false\nSI.hScan2D.virtualChannelSettings__1.disableDivide = false\nSI.hScan2D.virtualChannelSettings__1.thresholdValue = 100\nSI.hScan2D.virtualChannelSettings__1.laserFilterWindow = [0 1]\nSI.hScan2D.virtualChannelSettings__2.source = 'AI1'\nSI.hScan2D.virtualChannelSettings__2.mode = 'analog'\nSI.hScan2D.virtualChannelSettings__2.threshold = false\nSI.hScan2D.virtualChannelSettings__2.binarize = false\nSI.hScan2D.virtualChannelSettings__2.edgeDetect = false\nSI.hScan2D.virtualChannelSettings__2.laserGate = false\nSI.hScan2D.virtualChannelSettings__2.disableDivide = false\nSI.hScan2D.virtualChannelSettings__2.thresholdValue = 100\nSI.hScan2D.virtualChannelSettings__2.laserFilterWindow = [0 1]\nSI.hScan2D.virtualChannelSettings__3.source = 'AI2'\nSI.hScan2D.virtualChannelSettings__3.mode = 'analog'\nSI.hScan2D.virtualChannelSettings__3.threshold = false\nSI.hScan2D.virtualChannelSettings__3.binarize = false\nSI.hScan2D.virtualChannelSettings__3.edgeDetect = false\nSI.hScan2D.virtualChannelSettings__3.laserGate = false\nSI.hScan2D.virtualChannelSettings__3.disableDivide = false\nSI.hScan2D.virtualChannelSettings__3.thresholdValue = 100\nSI.hScan2D.virtualChannelSettings__3.laserFilterWindow = [0 1]\nSI.hScan2D.virtualChannelSettings__4.source = 'AI3'\nSI.hScan2D.virtualChannelSettings__4.mode = 'analog'\nSI.hScan2D.virtualChannelSettings__4.threshold = false\nSI.hScan2D.virtualChannelSettings__4.binarize = false\nSI.hScan2D.virtualChannelSettings__4.edgeDetect = false\nSI.hScan2D.virtualChannelSettings__4.laserGate = false\nSI.hScan2D.virtualChannelSettings__4.disableDivide = false\nSI.hScan2D.virtualChannelSettings__4.thresholdValue = 100\nSI.hScan2D.virtualChannelSettings__4.laserFilterWindow = [0 1]\nSI.hScan2D.warnMsg = ''\nSI.hShutters.errorMsg = ''\nSI.hShutters.name = 'SI Shutters'\nSI.hShutters.reserverInfo = ''\nSI.hShutters.userInfo = ''\nSI.hShutters.warnMsg = ''\nSI.hStackManager.actualNumSlices = 0\nSI.hStackManager.actualNumVolumes = 1000000\nSI.hStackManager.actualStackZStepSize = []\nSI.hStackManager.arbitraryZs = [240 200]\nSI.hStackManager.arbitraryZsAreSampleRelative = true\nSI.hStackManager.boundedStackDefinition = 'numSlices'\nSI.hStackManager.centeredStack = 1\nSI.hStackManager.closeShutterBetweenSlices = false\nSI.hStackManager.enable = true\nSI.hStackManager.errorMsg = ''\nSI.hStackManager.framesPerSlice = Inf\nSI.hStackManager.name = 'SI StackManager'\nSI.hStackManager.numFastZActuators = 2\nSI.hStackManager.numFramesPerVolume = 1\nSI.hStackManager.numFramesPerVolumeWithFlyback = 1\nSI.hStackManager.numSlices = 25\nSI.hStackManager.numVolumes = 1000000\nSI.hStackManager.reserverInfo = ''\nSI.hStackManager.stackActuator = 'fastZ'\nSI.hStackManager.stackDefinition = 'arbitrary'\nSI.hStackManager.stackEndPowerFraction = []\nSI.hStackManager.stackFastWaveformType = 'step'\nSI.hStackManager.stackMode = 'fast'\nSI.hStackManager.stackReturnHome = true\nSI.hStackManager.stackStartPowerFraction = []\nSI.hStackManager.stackZEndPos = []\nSI.hStackManager.stackZStartPos = []\nSI.hStackManager.stackZStepSize = 25\nSI.hStackManager.useStartEndPowers = true\nSI.hStackManager.userInfo = ''\nSI.hStackManager.warnMsg = ''\nSI.hStackManager.zPowerReference = 240\nSI.hStackManager.zs = 240\nSI.hStackManager.zsAllActuators = [240 200]\nSI.hStackManager.zsRelative = [240 200]\nSI.hTileManager.acqDoneFlag = false\nSI.hTileManager.errorMsg = ''\nSI.hTileManager.isFastZ = false\nSI.hTileManager.loopedAcquisition = false\nSI.hTileManager.name = 'SI TileManager'\nSI.hTileManager.reserverInfo = ''\nSI.hTileManager.scanAbortFlag = false\nSI.hTileManager.scanFramesPerTile = 1\nSI.hTileManager.scanStageSettleTime = 0.1\nSI.hTileManager.scanTileSortFcn = 'scanimage.components.tileTools.tileSortingFcns.naiveNearest'\nSI.hTileManager.tileScanIndices = []\nSI.hTileManager.tileScanningInProgress = false\nSI.hTileManager.tilesDone = []\nSI.hTileManager.userInfo = ''\nSI.hTileManager.warnMsg = ''\nSI.hUserFunctions.errorMsg = ''\nSI.hUserFunctions.name = 'SI UserFunctions'\nSI.hUserFunctions.reserverInfo = ''\nSI.hUserFunctions.userFunctionsCfg = []\nSI.hUserFunctions.userFunctionsUsr = []\nSI.hUserFunctions.userInfo = ''\nSI.hUserFunctions.warnMsg = ''\nSI.hWSConnector.communicationTimeout = 5\nSI.hWSConnector.enable = false\nSI.hWSConnector.errorMsg = ''\nSI.hWSConnector.name = 'SI WSConnector'\nSI.hWSConnector.reserverInfo = ''\nSI.hWSConnector.userInfo = ''\nSI.hWSConnector.warnMsg = ''\nSI.hWaveformManager.errorMsg = ''\nSI.hWaveformManager.name = 'SI WaveformManager'\nSI.hWaveformManager.optimizedScanners = {}\nSI.hWaveformManager.reserverInfo = ''\nSI.hWaveformManager.userInfo = ''\nSI.hWaveformManager.warnMsg = ''\nSI.imagingSystem = 'ImagingScanner'\nSI.loopAcqInterval = 10\nSI.minimizeOnStart = false\nSI.name = 'ScanImage'\nSI.objectiveResolution = 150\nSI.reserverInfo = ''\nSI.shutDownScript = ''\nSI.startUpScript = ''\nSI.userInfo = ''\nSI.warnMsg = ''\nSI.widgetVisibility = true\n",
+  "Format": "tif",
+  "Width": 512,
+  "Height": 4614,
+  "BitDepth": 16,
+  "ByteOrder": "little-endian",
+  "XResolution": 7314.566735924248,
+  "YResolution": 7314.566735924248,
+  "ResolutionUnit": "Centimeter"
+}

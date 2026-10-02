@@ -1,22 +1,59 @@
+"""Matplotlib helpers to plot points, lines, meshes and outlines in 2D and 3D."""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any
+
 import matplotlib.pyplot as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.axes import Axes
+
+if TYPE_CHECKING:
+    from iblatlas.atlas import AllenAtlas
 
 mpl.rcParams["axes3d.mouserotationstyle"] = "azel"
 
 # from CoordinateSystems import CoordinateSystem, LinkedCoordinateSystems
 
 
-def plot_path(points, closed=True, axes=None, **kwargs): ...
+def plot_path(
+    points: np.ndarray,
+    closed: bool = True,
+    axes: Axes | None = None,
+    **kwargs: Any,
+) -> Axes:
+    """Plot a path through points (not implemented yet)."""
 
 
-def plot_plane(p0, n, size, axes=None, **kwargs):
+def plot_plane(
+    p0: np.ndarray,
+    n: np.ndarray,
+    size: float,
+    axes: Axes | None = None,
+    **kwargs: Any,
+) -> Axes:
+    """Plot a square patch of a plane in normal form (not implemented yet)."""
     # calculate the edge points
     # plot a closed path
-    ...
 
 
-def plot_triangle(triangle_points, axes=None, **kwargs):
+def plot_triangle(
+    triangle_points: np.ndarray,
+    axes: Axes | None = None,
+    **kwargs: Any,
+) -> Axes:
+    """Plot the outline of a triangle.
+
+    Args:
+        triangle_points: The three vertices, one per row, shape `(3, 3)`.
+        axes: 3D axes to plot into. A new one is created if not given.
+        **kwargs: Passed on to `axes.plot`; the color defaults to black.
+
+    Returns:
+        The axes.
+    """
     if axes is None:
         axes = plt.figure().add_subplot(projection="3d")
 
@@ -31,7 +68,29 @@ def plot_triangle(triangle_points, axes=None, **kwargs):
     return axes
 
 
-def plot_line(l0, l, length=None, axes=None, **kwargs):
+def plot_line(
+    l0: np.ndarray,
+    l: np.ndarray,
+    length: Sequence[float] | None = None,
+    axes: Axes | None = None,
+    **kwargs: Any,
+) -> Axes:
+    """Plot a line given by a point and a direction.
+
+    The segment from `l0` to `l0 + l` is solid and ends in a dot; the line is
+    extended dotted to `l0 + length[0] * l` and `l0 + length[1] * l`.
+
+    Args:
+        l0: A point on the line, shape `(D,)`.
+        l: Direction of the line, shape `(D,)`.
+        length: Extent of the dotted extension in units of `l`. Defaults to
+            `[-5, 5]`.
+        axes: Axes to plot into. A new 3D axes is created if not given.
+        **kwargs: Passed on to `axes.plot`; the color defaults to black.
+
+    Returns:
+        The axes.
+    """
     if length is None:
         length = [-5, 5]
     if "color" not in kwargs:
@@ -48,7 +107,21 @@ def plot_line(l0, l, length=None, axes=None, **kwargs):
     return axes
 
 
-def plot_point(point: np.ndarray, axes=None, **kwargs):
+def plot_point(
+    point: np.ndarray,
+    axes: Axes | None = None,
+    **kwargs: Any,
+) -> Axes:
+    """Plot a single point.
+
+    Args:
+        point: The point, shape `(D,)`.
+        axes: Axes to plot into. A new 3D axes is created if not given.
+        **kwargs: Passed on to `axes.plot`; the color defaults to black.
+
+    Returns:
+        The axes.
+    """
     # for a point w shape (3,)
     if "color" not in kwargs:
         kwargs["color"] = "k"
@@ -61,7 +134,21 @@ def plot_point(point: np.ndarray, axes=None, **kwargs):
     return axes
 
 
-def plot_points(points: np.ndarray, axes=None, **kwargs):
+def plot_points(
+    points: np.ndarray,
+    axes: Axes | None = None,
+    **kwargs: Any,
+) -> Axes:
+    """Plot points as a 3D scatter.
+
+    Args:
+        points: The points, one per row, shape `(N, 3)`.
+        axes: 3D axes to plot into. A new one is created if not given.
+        **kwargs: Passed on to `axes.scatter3D`; the color defaults to black.
+
+    Returns:
+        The axes.
+    """
     # for a point w shape (3,)
     if "color" not in kwargs:
         kwargs["color"] = "k"
@@ -73,7 +160,24 @@ def plot_points(points: np.ndarray, axes=None, **kwargs):
     return axes
 
 
-def plot_mesh(mesh: dict, n=200, axes=None, **kwargs):
+def plot_mesh(
+    mesh: dict[str, np.ndarray],
+    n: int | None = 200,
+    axes: Axes | None = None,
+    **kwargs: Any,
+) -> Axes:
+    """Plot the faces of a triangle mesh as black outlines.
+
+    Args:
+        mesh: Mesh with "vertices", shape `(V, 3)`, and "edges" (the vertex
+            indices of each face), shape `(F, 3)`.
+        n: Number of randomly chosen faces to plot. All faces if `None`.
+        axes: 3D axes to plot into. A new one is created if not given.
+        **kwargs: Currently unused; the faces are always drawn in black.
+
+    Returns:
+        The axes.
+    """
     if axes is None:
         axes = plt.figure().add_subplot(projection="3d")
 
@@ -96,14 +200,31 @@ def plot_mesh(mesh: dict, n=200, axes=None, **kwargs):
 
 
 def plot_brain_surface_points(
-    brain_surface_points,
-    ds=4,
-    axes=None,
-    color=None,
-    labels=None,
-    atlas=None,
-    **scatter_kwargs,
-):
+    brain_surface_points: np.ndarray,
+    ds: int = 4,
+    axes: Axes | None = None,
+    color: Any = None,
+    labels: Any = None,
+    atlas: AllenAtlas | None = None,
+    **scatter_kwargs: Any,
+) -> Axes:
+    """Plot the brain surface points as a 3D scatter.
+
+    Args:
+        brain_surface_points: Surface points in µm, shape `(N, 3)`, e.g. from
+            `ProjectionAtlas.get_surface_points`.
+        ds: Plot only every `ds`-th point.
+        axes: 3D axes to plot into. A new one is created if not given.
+        color: Matplotlib color of the points, used if `labels` is `None`.
+        labels: If not `None`, color each point by its atlas region instead
+            (needs `atlas`); the value itself is not used.
+        atlas: Atlas to look up the regions and their colors.
+        **scatter_kwargs: Passed on to `axes.scatter`; `s` defaults to 1 and
+            `alpha` to 0.2.
+
+    Returns:
+        The axes.
+    """
     if axes is None:
         axes = plt.figure().add_subplot(projection="3d")
 
@@ -122,7 +243,15 @@ def plot_brain_surface_points(
     return axes
 
 
-def extent_from_corners(corners: dict) -> list:
+def extent_from_corners(corners: dict[str, np.ndarray]) -> list[float]:
+    """Return the matplotlib extent (left, right, bottom, top) of an image.
+
+    Args:
+        corners: The image corners, as returned by `Image.get_corners`.
+
+    Returns:
+        The extent for `matshow` / `imshow`.
+    """
     # as used by matshow
     # (left, right, bottom, top)
     return [
@@ -133,7 +262,22 @@ def extent_from_corners(corners: dict) -> list:
     ]
 
 
-def plot_fov_outline_from_corners(corners: dict, axes=None, **line_kwargs):
+def plot_fov_outline_from_corners(
+    corners: dict[str, np.ndarray],
+    axes: Axes | None = None,
+    **line_kwargs: Any,
+) -> Axes:
+    """Plot the outline of an image from its corners in 2D.
+
+    Args:
+        corners: The image corners, as returned by `Image.get_corners`.
+        axes: Axes to plot into. A new one is created if not given.
+        **line_kwargs: Passed on to `axes.plot`; `lw` defaults to 1 and the color
+            to black.
+
+    Returns:
+        The axes.
+    """
     if axes is None:
         _, axes = plt.subplots()
 
